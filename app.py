@@ -196,6 +196,7 @@ with tab0:
         ax.set_xlabel("Predicted Probability")
         ax.set_xlim(0, 1)
         st.pyplot(fig)
+        plt.close(fig)
 
 # ---- TAB 1: Confusion Matrix ----
 with tab1:
@@ -212,6 +213,7 @@ with tab1:
         ax.set_ylabel("Actual")
         plt.xticks(rotation=45, ha="right")
         st.pyplot(fig)
+        plt.close(fig)
     with c2:
         fig, ax = plt.subplots(figsize=(6, 5))
         sns.heatmap(cm_pct, annot=True, fmt=".1f", cmap="Blues",
@@ -221,6 +223,7 @@ with tab1:
         ax.set_ylabel("Actual")
         plt.xticks(rotation=45, ha="right")
         st.pyplot(fig)
+        plt.close(fig)
 
 # ---- TAB 2: Classification Report ----
 with tab2:
@@ -241,6 +244,7 @@ with tab3:
         ax.set_xlabel("Importance")
         ax.set_title("Top 15 Feature Importances")
         st.pyplot(fig)
+        plt.close(fig)
 
         st.dataframe(top15.reset_index().rename(
             columns={"index": "Feature", 0: "Importance"}
@@ -275,6 +279,7 @@ with tab4:
     axes[1].set_title("Zoomed View (Low FPR)")
 
     st.pyplot(fig)
+    plt.close(fig)
 
 st.markdown("---")
 st.caption("Obesity Levels dataset — UCI Machine Learning Repository")
