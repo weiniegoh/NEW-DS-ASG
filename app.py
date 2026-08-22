@@ -37,11 +37,11 @@ st.caption("CRISP-DM Project | Estimation of Obesity Levels Based on Eating Habi
 # ============================================================
 MODEL_REGISTRY = {
     "Random Forest": {
-        "model_path": "random_forest_model.pkl",
-        "X_test_path": "X_test_encoded.pkl",
-        "y_test_path": "y_test_flat.pkl",
-        "y_pred_path": "rf_y_pred.pkl",
-        "y_proba_path": "rf_y_pred_proba.pkl",
+        "model_path": "models/random_forest_model.pkl",
+        "X_test_path": "data/X_test_encoded.pkl",
+        "y_test_path": "data/y_test_flat.pkl",
+        "y_pred_path": "data/rf_y_pred.pkl",
+        "y_proba_path": "data/rf_y_pred_proba.pkl",
     },
     # "Decision Tree": {
     #     "model_path": "models/decision_tree_model.pkl",
