@@ -6,6 +6,10 @@ Run:
     streamlit run app.py
 """
 
+import os
+import hashlib
+import joblib
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -14,8 +18,6 @@ import matplotlib
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
-import joblib
-import hashlib
 
 from sklearn.metrics import (
     accuracy_score,
@@ -38,6 +40,11 @@ st.set_page_config(
     layout="wide"
 )
 
+
+# ============================================================
+# TITLE
+# ============================================================
+
 st.title(
     "Obesity Level Classification — Model Comparison"
 )
@@ -49,21 +56,32 @@ st.caption(
 
 
 # ============================================================
-# MODEL CONFIGURATION
+# FILE PATHS
 # ============================================================
 
-MODEL_PATH = "models/random_forest_model.pkl"
+MODEL_PATH = (
+    "models/random_forest_model.pkl"
+)
 
-FEATURE_PATH = "data/model_features.pkl"
+FEATURE_PATH = (
+    "data/model_features.pkl"
+)
 
-X_TEST_PATH = "data/X_test_encoded.pkl"
+X_TEST_PATH = (
+    "data/X_test_encoded.pkl"
+)
 
-Y_TEST_PATH = "data/y_test_flat.pkl"
+Y_TEST_PATH = (
+    "data/y_test_flat.pkl"
+)
 
-Y_PRED_PATH = "data/rf_y_pred.pkl"
+Y_PRED_PATH = (
+    "data/rf_y_pred.pkl"
+)
 
-Y_PROBA_PATH = "data/rf_y_pred_proba.pkl"
-
+Y_PROBA_PATH = (
+    "data/rf_y_pred_proba.pkl"
+)
 
 CONFUSION_IMAGE = (
     "images/rf_confusion_matrix.png"
@@ -79,11 +97,67 @@ ROC_IMAGE = (
 
 
 # ============================================================
-# LOAD MODEL
+# CHECK REQUIRED FILES
+# ============================================================
+
+required_files = [
+    MODEL_PATH,
+    FEATURE_PATH,
+    X_TEST_PATH,
+    Y_TEST_PATH,
+    Y_PRED_PATH,
+    Y_PROBA_PATH
+]
+
+missing_files = [
+    file
+    for file in required_files
+    if not os.path.exists(file)
+]
+
+if missing_files:
+
+    st.error(
+        "The following required model files are missing:"
+    )
+
+    for file in missing_files:
+        st.write(f"- `{file}`")
+
+    st.stop()
+
+
+# ============================================================
+# CALCULATE MODEL HASH
+# ============================================================
+
+def calculate_md5(path):
+
+    md5 = hashlib.md5()
+
+    with open(path, "rb") as f:
+
+        for chunk in iter(
+            lambda: f.read(8192),
+            b""
+        ):
+
+            md5.update(chunk)
+
+    return md5.hexdigest()
+
+
+model_hash = calculate_md5(
+    MODEL_PATH
+)
+
+
+# ============================================================
+# LOAD MODEL ARTIFACTS
 # ============================================================
 
 @st.cache_resource
-def load_model():
+def load_model_artifacts():
 
     model = joblib.load(
         MODEL_PATH
@@ -126,7 +200,56 @@ def load_model():
     y_test,
     y_pred,
     y_proba
-) = load_model()
+) = load_model_artifacts()
+
+
+# ============================================================
+# NORMALISE FEATURE LIST
+# ============================================================
+
+model_features = list(
+    model_features
+)
+
+
+# ============================================================
+# EXPECTED FEATURES
+# ============================================================
+
+EXPECTED_FEATURES = [
+
+    "Age",
+    "Height",
+    "Weight",
+    "FCVC",
+    "NCP",
+    "CH2O",
+    "FAF",
+    "TUE",
+
+    "Gender_Male",
+
+    "family_history_with_overweight_yes",
+
+    "FAVC_yes",
+
+    "CAEC_Frequently",
+    "CAEC_Sometimes",
+    "CAEC_no",
+
+    "SMOKE_yes",
+
+    "SCC_yes",
+
+    "CALC_Frequently",
+    "CALC_Sometimes",
+    "CALC_no",
+
+    "MTRANS_Bike",
+    "MTRANS_Motorbike",
+    "MTRANS_Public_Transportation",
+    "MTRANS_Walking"
+]
 
 
 # ============================================================
@@ -135,12 +258,35 @@ def load_model():
 
 if not hasattr(
     model,
+    "predict"
+):
+
+    st.error(
+        "Loaded file is not a valid scikit-learn model."
+    )
+
+    st.stop()
+
+
+if not hasattr(
+    model,
     "feature_importances_"
 ):
 
     st.error(
-        "The loaded model is not a Random Forest "
-        "model with feature_importances_."
+        "Loaded model does not contain "
+        "Random Forest feature_importances_."
+    )
+
+    st.stop()
+
+
+if model.n_features_in_ != 23:
+
+    st.error(
+        f"Random Forest expects "
+        f"{model.n_features_in_} features, "
+        f"but the application expects 23."
     )
 
     st.stop()
@@ -149,36 +295,47 @@ if not hasattr(
 if len(model_features) != 23:
 
     st.error(
-        f"Expected 23 model features, but found "
-        f"{len(model_features)}."
+        f"model_features.pkl contains "
+        f"{len(model_features)} features instead of 23."
     )
 
     st.stop()
 
 
-if len(model_features) != len(
-    model.feature_importances_
-):
+if list(model_features) != EXPECTED_FEATURES:
 
     st.error(
-        "Feature count does not match the Random Forest."
+        "The feature order/names in model_features.pkl "
+        "do not match the expected training features."
+    )
+
+    st.write(
+        "Loaded feature order:"
+    )
+
+    st.write(
+        model_features
+    )
+
+    st.write(
+        "Expected feature order:"
+    )
+
+    st.write(
+        EXPECTED_FEATURES
     )
 
     st.stop()
 
 
-# ============================================================
-# MODEL HASH
-# ============================================================
+if len(model.feature_importances_) != 23:
 
-with open(
-    MODEL_PATH,
-    "rb"
-) as f:
+    st.error(
+        "Random Forest feature importance length "
+        "does not equal 23."
+    )
 
-    model_hash = hashlib.md5(
-        f.read()
-    ).hexdigest()
+    st.stop()
 
 
 # ============================================================
@@ -191,17 +348,12 @@ st.sidebar.header(
 
 
 # ============================================================
-# PREDICTION INPUTS
+# DEMOGRAPHIC / PHYSICAL
 # ============================================================
 
 st.sidebar.subheader(
     "Prediction Inputs"
 )
-
-
-# ============================================================
-# DEMOGRAPHIC / PHYSICAL
-# ============================================================
 
 st.sidebar.markdown(
     "**Demographic & Physical Information**"
@@ -210,7 +362,10 @@ st.sidebar.markdown(
 
 gender = st.sidebar.selectbox(
     "Gender",
-    ["Female", "Male"],
+    [
+        "Female",
+        "Male"
+    ],
     key="gender"
 )
 
@@ -220,6 +375,7 @@ age = st.sidebar.number_input(
     min_value=1,
     max_value=100,
     value=25,
+    step=1,
     key="age"
 )
 
@@ -246,7 +402,10 @@ weight = st.sidebar.number_input(
 
 family_history = st.sidebar.selectbox(
     "Family history with overweight?",
-    ["yes", "no"],
+    [
+        "yes",
+        "no"
+    ],
     key="family_history"
 )
 
@@ -255,7 +414,11 @@ family_history = st.sidebar.selectbox(
 # BMI
 # ============================================================
 
-bmi = weight / (height ** 2)
+bmi = (
+    float(weight)
+    /
+    (float(height) ** 2)
+)
 
 
 st.sidebar.metric(
@@ -275,7 +438,10 @@ st.sidebar.markdown(
 
 favc = st.sidebar.selectbox(
     "Frequent high-calorie food (FAVC)?",
-    ["yes", "no"],
+    [
+        "yes",
+        "no"
+    ],
     key="favc"
 )
 
@@ -285,7 +451,7 @@ fcvc = st.sidebar.slider(
     1.0,
     3.0,
     2.0,
-    0.1,
+    step=0.1,
     key="fcvc"
 )
 
@@ -295,7 +461,7 @@ ncp = st.sidebar.slider(
     1.0,
     4.0,
     3.0,
-    0.1,
+    step=0.1,
     key="ncp"
 )
 
@@ -317,14 +483,17 @@ ch2o = st.sidebar.slider(
     1.0,
     3.0,
     2.0,
-    0.1,
+    step=0.1,
     key="ch2o"
 )
 
 
 scc = st.sidebar.selectbox(
     "Monitors calorie consumption (SCC)?",
-    ["no", "yes"],
+    [
+        "no",
+        "yes"
+    ],
     key="scc"
 )
 
@@ -352,7 +521,10 @@ st.sidebar.markdown(
 
 smoke = st.sidebar.selectbox(
     "Smoker?",
-    ["no", "yes"],
+    [
+        "no",
+        "yes"
+    ],
     key="smoke"
 )
 
@@ -362,7 +534,7 @@ faf = st.sidebar.slider(
     0.0,
     3.0,
     1.0,
-    0.1,
+    step=0.1,
     key="faf"
 )
 
@@ -372,7 +544,7 @@ tue = st.sidebar.slider(
     0.0,
     2.0,
     1.0,
-    0.1,
+    step=0.1,
     key="tue"
 )
 
@@ -391,82 +563,151 @@ mtrans = st.sidebar.selectbox(
 
 
 # ============================================================
-# BUILD EXACT 23 FEATURES
+# CREATE EXACT INPUT
 # ============================================================
 
 input_data = {
 
-    # Numerical features
-    "Age": float(age),
+    # --------------------------------------------------------
+    # NUMERICAL
+    # --------------------------------------------------------
 
-    "Height": float(height),
+    "Age":
+        float(age),
 
-    "Weight": float(weight),
+    "Height":
+        float(height),
 
-    "FCVC": float(fcvc),
+    "Weight":
+        float(weight),
 
-    "NCP": float(ncp),
+    "FCVC":
+        float(fcvc),
 
-    "CH2O": float(ch2o),
+    "NCP":
+        float(ncp),
 
-    "FAF": float(faf),
+    "CH2O":
+        float(ch2o),
 
-    "TUE": float(tue),
+    "FAF":
+        float(faf),
 
-    # Gender
+    "TUE":
+        float(tue),
+
+    # --------------------------------------------------------
+    # GENDER
+    # --------------------------------------------------------
+
     "Gender_Male":
-        1 if gender == "Male" else 0,
+        1.0
+        if gender == "Male"
+        else 0.0,
 
-    # Family history
+    # --------------------------------------------------------
+    # FAMILY HISTORY
+    # --------------------------------------------------------
+
     "family_history_with_overweight_yes":
-        1 if family_history == "yes" else 0,
+        1.0
+        if family_history == "yes"
+        else 0.0,
 
+    # --------------------------------------------------------
     # FAVC
-    "FAVC_yes":
-        1 if favc == "yes" else 0,
+    # --------------------------------------------------------
 
+    "FAVC_yes":
+        1.0
+        if favc == "yes"
+        else 0.0,
+
+    # --------------------------------------------------------
     # CAEC
+    # --------------------------------------------------------
+
     "CAEC_Frequently":
-        1 if caec == "Frequently" else 0,
+        1.0
+        if caec == "Frequently"
+        else 0.0,
 
     "CAEC_Sometimes":
-        1 if caec == "Sometimes" else 0,
+        1.0
+        if caec == "Sometimes"
+        else 0.0,
 
     "CAEC_no":
-        1 if caec == "no" else 0,
+        1.0
+        if caec == "no"
+        else 0.0,
 
+    # --------------------------------------------------------
     # SMOKE
+    # --------------------------------------------------------
+
     "SMOKE_yes":
-        1 if smoke == "yes" else 0,
+        1.0
+        if smoke == "yes"
+        else 0.0,
 
+    # --------------------------------------------------------
     # SCC
-    "SCC_yes":
-        1 if scc == "yes" else 0,
+    # --------------------------------------------------------
 
+    "SCC_yes":
+        1.0
+        if scc == "yes"
+        else 0.0,
+
+    # --------------------------------------------------------
     # CALC
+    # --------------------------------------------------------
+
     "CALC_Frequently":
-        1 if calc == "Frequently" else 0,
+        1.0
+        if calc == "Frequently"
+        else 0.0,
 
     "CALC_Sometimes":
-        1 if calc == "Sometimes" else 0,
+        1.0
+        if calc == "Sometimes"
+        else 0.0,
 
     "CALC_no":
-        1 if calc == "no" else 0,
+        1.0
+        if calc == "no"
+        else 0.0,
 
+    # --------------------------------------------------------
     # MTRANS
+    # --------------------------------------------------------
+
     "MTRANS_Bike":
-        1 if mtrans == "Bike" else 0,
+        1.0
+        if mtrans == "Bike"
+        else 0.0,
 
     "MTRANS_Motorbike":
-        1 if mtrans == "Motorbike" else 0,
+        1.0
+        if mtrans == "Motorbike"
+        else 0.0,
 
     "MTRANS_Public_Transportation":
-        1 if mtrans == "Public_Transportation" else 0,
+        1.0
+        if mtrans == "Public_Transportation"
+        else 0.0,
 
     "MTRANS_Walking":
-        1 if mtrans == "Walking" else 0
+        1.0
+        if mtrans == "Walking"
+        else 0.0
 }
 
+
+# ============================================================
+# CREATE DATAFRAME
+# ============================================================
 
 input_df = pd.DataFrame(
     [input_data]
@@ -474,22 +715,45 @@ input_df = pd.DataFrame(
 
 
 # ============================================================
-# FORCE EXACT TRAINING FEATURE ORDER
+# FORCE EXACT FEATURE ORDER
 # ============================================================
 
-input_df = input_df.reindex(
-    columns=model_features,
-    fill_value=0
-)
+input_df = input_df[
+    EXPECTED_FEATURES
+]
 
 
 # ============================================================
-# FORCE NUMERIC TYPE
+# FORCE FLOAT64
 # ============================================================
 
 input_df = input_df.astype(
     np.float64
 )
+
+
+# ============================================================
+# FINAL INPUT VALIDATION
+# ============================================================
+
+if input_df.shape != (1, 23):
+
+    st.error(
+        f"Invalid model input shape: "
+        f"{input_df.shape}. "
+        f"Expected (1, 23)."
+    )
+
+    st.stop()
+
+
+if list(input_df.columns) != EXPECTED_FEATURES:
+
+    st.error(
+        "Input feature order is incorrect."
+    )
+
+    st.stop()
 
 
 # ============================================================
@@ -506,8 +770,8 @@ prediction_proba = model.predict_proba(
 )[0]
 
 
-prediction_probability = (
-    float(np.max(prediction_proba))
+prediction_probability = float(
+    np.max(prediction_proba)
 )
 
 
@@ -523,7 +787,10 @@ proba_df = pd.DataFrame({
     "Probability":
         prediction_proba
 
-}).sort_values(
+})
+
+
+proba_df = proba_df.sort_values(
     "Probability",
     ascending=False
 )
@@ -575,7 +842,7 @@ roc_auc_macro = roc_auc_score(
 
 
 # ============================================================
-# MAIN HEADER
+# MAIN DASHBOARD
 # ============================================================
 
 st.header(
@@ -621,7 +888,7 @@ c5.metric(
 
 
 # ============================================================
-# PREDICTION
+# PREDICTION RESULT
 # ============================================================
 
 st.markdown("---")
@@ -642,9 +909,17 @@ with p1:
         "### Predicted Obesity Level"
     )
 
-    st.success(
-        f"## {prediction}"
-    )
+    if prediction == "Obesity_Type_III":
+
+        st.success(
+            f"## {prediction}"
+        )
+
+    else:
+
+        st.warning(
+            f"## {prediction}"
+        )
 
     st.metric(
         "Prediction Probability",
@@ -663,8 +938,8 @@ with p2:
     )
 
     ax.barh(
-        proba_df["Class"][::-1],
-        proba_df["Probability"][::-1]
+        proba_df["Class"].values[::-1],
+        proba_df["Probability"].values[::-1]
     )
 
     ax.set_xlabel(
@@ -682,7 +957,9 @@ with p2:
         fig
     )
 
-    plt.close(fig)
+    plt.close(
+        fig
+    )
 
 
 # ============================================================
@@ -754,17 +1031,17 @@ with c3:
 
 
 # ============================================================
-# DEBUG / VERIFICATION
+# MODEL VERIFICATION
 # ============================================================
 
 st.markdown("---")
 
 with st.expander(
-    "🔍 Verify Model Input"
+    "🔍 Model & Input Verification"
 ):
 
     st.write(
-        "**Model file:**",
+        "**Loaded model:**",
         MODEL_PATH
     )
 
@@ -774,7 +1051,26 @@ with st.expander(
     )
 
     st.write(
-        "**Number of features:**",
+        "**Model type:**",
+        type(model).__name__
+    )
+
+    st.write(
+        "**Number of trees:**",
+        getattr(
+            model,
+            "n_estimators",
+            "N/A"
+        )
+    )
+
+    st.write(
+        "**Number of model features:**",
+        model.n_features_in_
+    )
+
+    st.write(
+        "**Number of saved features:**",
         len(model_features)
     )
 
@@ -784,12 +1080,50 @@ with st.expander(
     )
 
     st.write(
-        "**BMI:**",
+        "**Height:**",
+        height
+    )
+
+    st.write(
+        "**Weight:**",
+        weight
+    )
+
+    st.write(
+        "**Calculated BMI:**",
         bmi
     )
 
     st.write(
-        "**Exact input sent to Random Forest:**"
+        "**Prediction:**",
+        prediction
+    )
+
+    st.write(
+        "**Exact probabilities:**"
+    )
+
+    probability_debug = pd.DataFrame({
+
+        "Class":
+            model.classes_,
+
+        "Probability":
+            prediction_proba,
+
+        "Percentage":
+            prediction_proba * 100
+
+    })
+
+    st.dataframe(
+        probability_debug,
+        hide_index=True,
+        width="stretch"
+    )
+
+    st.write(
+        "**Exact 23 features sent to model:**"
     )
 
     st.dataframe(
@@ -813,44 +1147,68 @@ st.header(
 comparison_df = pd.DataFrame({
 
     "Model": [
+
         "Random Forest",
+
         "K-Nearest Neighbours (KNN)",
+
         "Logistic Regression",
+
         "Gradient Boosting"
     ],
 
     "Accuracy": [
+
         f"{accuracy:.2%}",
+
         "Not Available",
+
         "Not Available",
+
         "Not Available"
     ],
 
     "F1 (Weighted)": [
+
         f"{f1_weighted:.4f}",
+
         "Not Available",
+
         "Not Available",
+
         "Not Available"
     ],
 
     "Precision (Weighted)": [
+
         f"{precision_w:.4f}",
+
         "Not Available",
+
         "Not Available",
+
         "Not Available"
     ],
 
     "Recall (Weighted)": [
+
         f"{recall_w:.4f}",
+
         "Not Available",
+
         "Not Available",
+
         "Not Available"
     ],
 
     "ROC-AUC (Macro)": [
+
         f"{roc_auc_macro:.4f}",
+
         "Not Available",
+
         "Not Available",
+
         "Not Available"
     ]
 })
@@ -891,10 +1249,20 @@ if section == "Confusion Matrix":
         "Confusion Matrix"
     )
 
-    st.image(
-        CONFUSION_IMAGE,
-        width="stretch"
-    )
+    if os.path.exists(
+        CONFUSION_IMAGE
+    ):
+
+        st.image(
+            CONFUSION_IMAGE,
+            width="stretch"
+        )
+
+    else:
+
+        st.warning(
+            "Confusion matrix image not found."
+        )
 
 
 # ============================================================
@@ -914,7 +1282,9 @@ elif section == "Classification Report":
     )
 
     report_df = (
-        pd.DataFrame(report)
+        pd.DataFrame(
+            report
+        )
         .transpose()
         .round(4)
     )
@@ -935,10 +1305,14 @@ elif section == "Feature Importance":
         "Feature Importance"
     )
 
-    st.image(
-        FEATURE_IMPORTANCE_IMAGE,
-        width="stretch"
-    )
+    if os.path.exists(
+        FEATURE_IMPORTANCE_IMAGE
+    ):
+
+        st.image(
+            FEATURE_IMPORTANCE_IMAGE,
+            width="stretch"
+        )
 
     importances = pd.Series(
         model.feature_importances_,
@@ -975,10 +1349,20 @@ elif section == "ROC Curves":
         "ROC Curves"
     )
 
-    st.image(
-        ROC_IMAGE,
-        width="stretch"
-    )
+    if os.path.exists(
+        ROC_IMAGE
+    ):
+
+        st.image(
+            ROC_IMAGE,
+            width="stretch"
+        )
+
+    else:
+
+        st.warning(
+            "ROC curve image not found."
+        )
 
 
 # ============================================================
