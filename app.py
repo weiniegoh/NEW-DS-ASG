@@ -480,13 +480,11 @@ prediction = model.predict(
     input_aligned
 )[0]
 
-
 prediction_proba = model.predict_proba(
     input_aligned
 )[0]
 
-
-prediction_confidence = prediction_proba.max()
+prediction_probability = prediction_proba.max()
 
 
 proba_df = pd.DataFrame({
@@ -571,8 +569,8 @@ with prediction_col1:
     )
 
     st.metric(
-        "Prediction Confidence",
-        f"{prediction_confidence:.2%}"
+        "Prediction Probability",
+        f"{prediction_probability:.2%}"
     )
 
     st.caption(
