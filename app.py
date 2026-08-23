@@ -91,7 +91,15 @@ MODEL_REGISTRY = {
     },
 
     "Gradient Boosting": {
-        "available": False,
+        "available": True,
+        "model_path": "models/xgboost_model.pkl",
+        "X_test_path": "data/X_test_encoded.pkl",
+        "y_test_path": "data/y_test_flat.pkl",
+        "y_pred_path": "data/xgb_y_pred.pkl",
+        "y_proba_path": "data/xgb_y_pred_proba.pkl",
+        "confusion_matrix_image": "images/xgb_confusion_matrix.png",
+        "feature_importance_image": "images/xgb_feature_importance.png",
+        "roc_curve_image": "images/xgb_roc_curves.png",
     },
 }
 
