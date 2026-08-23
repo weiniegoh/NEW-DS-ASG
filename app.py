@@ -1006,6 +1006,10 @@ st.write("=== DEBUG: PREDICTION PROBABILITIES ===")
 for cls, prob in zip(model.classes_, prediction_proba):
 
     st.write(f"{cls}: {prob:.4%}")
+
+st.write(X_test[["Height", "Weight", "Age"]].head(20))
+
+st.write(X_test["Height"].value_counts().head(20))
 # ============================================================
 # FOOTER
 # ============================================================
