@@ -1,24 +1,30 @@
 """
 Obesity Level Classification — Model Comparison Dashboard
 ============================================================
-Run with: streamlit run app.py
+Run with:
+    streamlit run app.py
 """
 
 import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib
+
 matplotlib.use("Agg")
+
 import matplotlib.pyplot as plt
-import seaborn as sns
 import joblib
-import os
 import gc
 
 from sklearn.metrics import (
-    accuracy_score, f1_score, precision_score, recall_score,
-    classification_report, roc_auc_score
+    accuracy_score,
+    f1_score,
+    precision_score,
+    recall_score,
+    classification_report,
+    roc_auc_score
 )
+
 from sklearn.preprocessing import label_binarize
 
 
@@ -32,6 +38,7 @@ st.set_page_config(
 )
 
 st.title("Obesity Level Classification — Model Comparison")
+
 st.caption(
     "CRISP-DM Project | Estimation of Obesity Levels Based on "
     "Eating Habits and Physical Condition"
@@ -41,27 +48,44 @@ st.caption(
 # ============================================================
 # MODEL REGISTRY
 # ============================================================
-# Add each new model here once its files are available.
-#
-# For models that are not ready yet, keep:
-#     "available": False
-#
-# Once the model is ready, change it to:
-#     "available": True
-#
-# and provide the required file paths.
-# ============================================================
 
 MODEL_REGISTRY = {
 
     "Random Forest": {
+
         "available": True,
 
-        "model_path": "models/random_forest_model.pkl",
-        "X_test_path": "data/X_test_encoded.pkl",
-        "y_test_path": "data/y_test_flat.pkl",
-        "y_pred_path": "data/rf_y_pred.pkl",
-        "y_proba_path": "data/rf_y_pred_proba.pkl",
+        # ----------------------------------------------------
+        # MODEL
+        # ----------------------------------------------------
+
+        "model_path":
+            "models/random_forest_model.pkl",
+
+        # IMPORTANT:
+        # Exact 23 features used during model training
+        "model_features_path":
+            "models/model_features.pkl",
+
+        # ----------------------------------------------------
+        # TESTING ARTIFACTS
+        # ----------------------------------------------------
+
+        "X_test_path":
+            "data/X_test_encoded.pkl",
+
+        "y_test_path":
+            "data/y_test_flat.pkl",
+
+        "y_pred_path":
+            "data/rf_y_pred.pkl",
+
+        "y_proba_path":
+            "data/rf_y_pred_proba.pkl",
+
+        # ----------------------------------------------------
+        # IMAGES
+        # ----------------------------------------------------
 
         "confusion_matrix_image":
             "images/rf_confusion_matrix.png",
@@ -73,15 +97,21 @@ MODEL_REGISTRY = {
             "images/rf_roc_curves.png",
     },
 
+
     "K-Nearest Neighbours (KNN)": {
+
         "available": False,
     },
+
 
     "Logistic Regression": {
+
         "available": False,
     },
 
+
     "Gradient Boosting": {
+
         "available": False,
     },
 }
@@ -94,13 +124,42 @@ MODEL_REGISTRY = {
 @st.cache_resource
 def load_artifacts(config):
 
-    model = joblib.load(config["model_path"])
-    X_test = joblib.load(config["X_test_path"])
-    y_test = joblib.load(config["y_test_path"])
-    y_pred = joblib.load(config["y_pred_path"])
-    y_proba = joblib.load(config["y_proba_path"])
+    model = joblib.load(
+        config["model_path"]
+    )
 
-    return model, X_test, y_test, y_pred, y_proba
+    # --------------------------------------------------------
+    # Load exact feature order used during training
+    # --------------------------------------------------------
+
+    model_features = joblib.load(
+        config["model_features_path"]
+    )
+
+    X_test = joblib.load(
+        config["X_test_path"]
+    )
+
+    y_test = joblib.load(
+        config["y_test_path"]
+    )
+
+    y_pred = joblib.load(
+        config["y_pred_path"]
+    )
+
+    y_proba = joblib.load(
+        config["y_proba_path"]
+    )
+
+    return (
+        model,
+        model_features,
+        X_test,
+        y_test,
+        y_pred,
+        y_proba
+    )
 
 
 # ============================================================
@@ -122,7 +181,9 @@ selected_model_name = st.sidebar.selectbox(
     key="selected_model"
 )
 
-selected_config = MODEL_REGISTRY[selected_model_name]
+selected_config = MODEL_REGISTRY[
+    selected_model_name
+]
 
 
 # ============================================================
@@ -130,7 +191,10 @@ selected_config = MODEL_REGISTRY[selected_model_name]
 # ============================================================
 
 st.sidebar.markdown("---")
-st.sidebar.subheader("Prediction Inputs")
+
+st.sidebar.subheader(
+    "Prediction Inputs"
+)
 
 st.sidebar.caption(
     "Enter an individual's information. "
@@ -138,17 +202,24 @@ st.sidebar.caption(
 )
 
 
-# ------------------------------------------------------------
+# ============================================================
 # DEMOGRAPHIC & PHYSICAL INFORMATION
-# ------------------------------------------------------------
+# ============================================================
 
-st.sidebar.markdown("**Demographic & Physical Information**")
+st.sidebar.markdown(
+    "**Demographic & Physical Information**"
+)
+
 
 gender = st.sidebar.selectbox(
     "Gender",
-    ["Female", "Male"],
+    [
+        "Female",
+        "Male"
+    ],
     key="input_gender"
 )
+
 
 age = st.sidebar.number_input(
     "Age (years)",
@@ -157,6 +228,7 @@ age = st.sidebar.number_input(
     value=25,
     key="input_age"
 )
+
 
 height = st.sidebar.number_input(
     "Height (m)",
@@ -167,6 +239,7 @@ height = st.sidebar.number_input(
     key="input_height"
 )
 
+
 weight = st.sidebar.number_input(
     "Weight (kg)",
     min_value=20.0,
@@ -176,16 +249,20 @@ weight = st.sidebar.number_input(
     key="input_weight"
 )
 
+
 family_history = st.sidebar.selectbox(
     "Family history of overweight?",
-    ["yes", "no"],
+    [
+        "yes",
+        "no"
+    ],
     key="input_family_history"
 )
 
 
-# ------------------------------------------------------------
+# ============================================================
 # BMI
-# ------------------------------------------------------------
+# ============================================================
 
 bmi = weight / (height ** 2)
 
@@ -195,17 +272,24 @@ st.sidebar.metric(
 )
 
 
-# ------------------------------------------------------------
+# ============================================================
 # EATING HABITS
-# ------------------------------------------------------------
+# ============================================================
 
-st.sidebar.markdown("**Eating Habits**")
+st.sidebar.markdown(
+    "**Eating Habits**"
+)
+
 
 favc = st.sidebar.selectbox(
     "Frequent high-calorie food (FAVC)?",
-    ["yes", "no"],
+    [
+        "yes",
+        "no"
+    ],
     key="input_favc"
 )
+
 
 fcvc = st.sidebar.slider(
     "Vegetable consumption frequency (FCVC)",
@@ -216,6 +300,7 @@ fcvc = st.sidebar.slider(
     key="input_fcvc"
 )
 
+
 ncp = st.sidebar.slider(
     "Number of main meals (NCP)",
     1.0,
@@ -225,11 +310,18 @@ ncp = st.sidebar.slider(
     key="input_ncp"
 )
 
+
 caec = st.sidebar.selectbox(
     "Eating between meals (CAEC)",
-    ["no", "Sometimes", "Frequently", "Always"],
+    [
+        "no",
+        "Sometimes",
+        "Frequently",
+        "Always"
+    ],
     key="input_caec"
 )
+
 
 ch2o = st.sidebar.slider(
     "Daily water consumption (CH2O)",
@@ -240,30 +332,47 @@ ch2o = st.sidebar.slider(
     key="input_ch2o"
 )
 
+
 scc = st.sidebar.selectbox(
     "Monitors calorie consumption (SCC)?",
-    ["no", "yes"],
+    [
+        "no",
+        "yes"
+    ],
     key="input_scc"
 )
 
+
 calc = st.sidebar.selectbox(
     "Alcohol consumption (CALC)",
-    ["no", "Sometimes", "Frequently", "Always"],
+    [
+        "no",
+        "Sometimes",
+        "Frequently",
+        "Always"
+    ],
     key="input_calc"
 )
 
 
-# ------------------------------------------------------------
+# ============================================================
 # LIFESTYLE
-# ------------------------------------------------------------
+# ============================================================
 
-st.sidebar.markdown("**Lifestyle**")
+st.sidebar.markdown(
+    "**Lifestyle**"
+)
+
 
 smoke = st.sidebar.selectbox(
     "Smoker?",
-    ["no", "yes"],
+    [
+        "no",
+        "yes"
+    ],
     key="input_smoke"
 )
+
 
 faf = st.sidebar.slider(
     "Physical activity frequency (FAF)",
@@ -274,6 +383,7 @@ faf = st.sidebar.slider(
     key="input_faf"
 )
 
+
 tue = st.sidebar.slider(
     "Time using technology devices (TUE)",
     0.0,
@@ -282,6 +392,7 @@ tue = st.sidebar.slider(
     step=0.1,
     key="input_tue"
 )
+
 
 mtrans = st.sidebar.selectbox(
     "Transportation used (MTRANS)",
@@ -300,71 +411,115 @@ mtrans = st.sidebar.selectbox(
 # CHECK WHETHER MODEL IS AVAILABLE
 # ============================================================
 
-if not selected_config.get("available", False):
+if not selected_config.get(
+    "available",
+    False
+):
 
     st.info(
-        f"**{selected_model_name}** has not been imported yet. "
-        "The model will appear here once its trained model and "
-        "prediction artifacts are added."
+        f"**{selected_model_name}** has not been "
+        "imported yet. The model will appear here "
+        "once its trained model and prediction "
+        "artifacts are added."
     )
 
+
     # --------------------------------------------------------
-    # MODEL COMPARISON TABLE STILL SHOWN
+    # MODEL COMPARISON
     # --------------------------------------------------------
 
-    st.header("Model Comparison")
+    st.header(
+        "Model Comparison"
+    )
+
 
     comparison_data = {
+
         "Model": [
             "Random Forest",
             "K-Nearest Neighbours (KNN)",
             "Logistic Regression",
             "Gradient Boosting"
         ],
+
         "Accuracy": [
-            "87.24%" if MODEL_REGISTRY["Random Forest"]["available"]
+
+            "87.24%"
+            if MODEL_REGISTRY[
+                "Random Forest"
+            ]["available"]
             else "Not Available",
+
             "Not Available",
             "Not Available",
             "Not Available"
         ],
+
         "F1 (Weighted)": [
-            "0.8732" if MODEL_REGISTRY["Random Forest"]["available"]
+
+            "0.8732"
+            if MODEL_REGISTRY[
+                "Random Forest"
+            ]["available"]
             else "Not Available",
+
             "Not Available",
             "Not Available",
             "Not Available"
         ],
+
         "Precision (Weighted)": [
-            "Available" if MODEL_REGISTRY["Random Forest"]["available"]
+
+            "Available"
+            if MODEL_REGISTRY[
+                "Random Forest"
+            ]["available"]
             else "Not Available",
+
             "Not Available",
             "Not Available",
             "Not Available"
         ],
+
         "Recall (Weighted)": [
-            "Available" if MODEL_REGISTRY["Random Forest"]["available"]
+
+            "Available"
+            if MODEL_REGISTRY[
+                "Random Forest"
+            ]["available"]
             else "Not Available",
+
             "Not Available",
             "Not Available",
             "Not Available"
         ],
+
         "ROC-AUC (Macro)": [
-            "Available" if MODEL_REGISTRY["Random Forest"]["available"]
+
+            "Available"
+            if MODEL_REGISTRY[
+                "Random Forest"
+            ]["available"]
             else "Not Available",
+
             "Not Available",
             "Not Available",
             "Not Available"
         ]
     }
 
-    comparison_df = pd.DataFrame(comparison_data)
+
+    comparison_df = pd.DataFrame(
+        comparison_data
+    )
+
 
     st.dataframe(
         comparison_df,
         width="stretch",
         hide_index=True
     )
+
 
     st.stop()
 
@@ -373,11 +528,40 @@ if not selected_config.get("available", False):
 # LOAD SELECTED MODEL
 # ============================================================
 
-model, X_test, y_test, y_pred, y_proba = load_artifacts(
+(
+    model,
+    model_features,
+    X_test,
+    y_test,
+    y_pred,
+    y_proba
+) = load_artifacts(
     selected_config
 )
 
+
+# ============================================================
+# VERIFY MODEL FEATURES
+# ============================================================
+
+if len(model_features) != len(
+    model.feature_importances_
+):
+
+    st.error(
+        "Model feature count does not match "
+        "the feature list saved in model_features.pkl."
+    )
+
+    st.stop()
+
+
+# ============================================================
+# CLASS INFORMATION
+# ============================================================
+
 class_names = model.classes_
+
 
 y_test_binarized = label_binarize(
     y_test,
@@ -394,11 +578,13 @@ accuracy = accuracy_score(
     y_pred
 )
 
+
 f1_weighted = f1_score(
     y_test,
     y_pred,
     average="weighted"
 )
+
 
 precision_w = precision_score(
     y_test,
@@ -406,11 +592,13 @@ precision_w = precision_score(
     average="weighted"
 )
 
+
 recall_w = recall_score(
     y_test,
     y_pred,
     average="weighted"
 )
+
 
 roc_auc_macro = roc_auc_score(
     y_test_binarized,
@@ -421,44 +609,86 @@ roc_auc_macro = roc_auc_score(
 
 
 # ============================================================
-# PREDICTION
+# CREATE USER INPUT DATAFRAME
 # ============================================================
 
 input_dict = {
 
-    "Gender": gender,
-    "Age": age,
-    "Height": height,
-    "Weight": weight,
+    "Gender":
+        gender,
+
+    "Age":
+        age,
+
+    "Height":
+        height,
+
+    "Weight":
+        weight,
 
     "family_history_with_overweight":
         family_history,
 
-    "FAVC": favc,
-    "FCVC": fcvc,
-    "NCP": ncp,
-    "CAEC": caec,
-    "SMOKE": smoke,
-    "CH2O": ch2o,
-    "SCC": scc,
-    "FAF": faf,
-    "TUE": tue,
-    "CALC": calc,
-    "MTRANS": mtrans,
+    "FAVC":
+        favc,
+
+    "FCVC":
+        fcvc,
+
+    "NCP":
+        ncp,
+
+    "CAEC":
+        caec,
+
+    "SMOKE":
+        smoke,
+
+    "CH2O":
+        ch2o,
+
+    "SCC":
+        scc,
+
+    "FAF":
+        faf,
+
+    "TUE":
+        tue,
+
+    "CALC":
+        calc,
+
+    "MTRANS":
+        mtrans,
 }
 
 
-input_df = pd.DataFrame([input_dict])
+input_df = pd.DataFrame(
+    [input_dict]
+)
 
+
+# ============================================================
+# CATEGORICAL ENCODING
+# ============================================================
 
 categorical_columns = [
+
     "Gender",
+
     "family_history_with_overweight",
+
     "FAVC",
+
     "CAEC",
+
     "SMOKE",
+
     "SCC",
+
     "CALC",
+
     "MTRANS"
 ]
 
@@ -470,26 +700,78 @@ input_encoded = pd.get_dummies(
 )
 
 
+# ============================================================
+# ALIGN INPUT WITH MODEL FEATURES
+# ============================================================
+#
+# IMPORTANT:
+#
+# We use model_features.pkl instead of X_test.columns.
+#
+# This guarantees that:
+#
+# 1. The same 23 features are used
+# 2. The feature order is identical
+# 3. Missing dummy variables become 0
+# 4. Extra columns are removed
+#
+# ============================================================
+
 input_aligned = input_encoded.reindex(
-    columns=X_test.columns,
+    columns=model_features,
     fill_value=0
 )
 
+
+# ============================================================
+# FINAL FEATURE COUNT CHECK
+# ============================================================
+
+if input_aligned.shape[1] != len(
+    model_features
+):
+
+    st.error(
+        f"Input feature mismatch. "
+        f"Model expects {len(model_features)} "
+        f"features but received "
+        f"{input_aligned.shape[1]}."
+    )
+
+    st.stop()
+
+
+# ============================================================
+# PREDICTION
+# ============================================================
 
 prediction = model.predict(
     input_aligned
 )[0]
 
+
 prediction_proba = model.predict_proba(
     input_aligned
 )[0]
 
-prediction_probability = prediction_proba.max()
 
+prediction_probability = (
+    prediction_proba.max()
+)
+
+
+# ============================================================
+# PROBABILITY DATAFRAME
+# ============================================================
 
 proba_df = pd.DataFrame({
-    "Class": model.classes_,
-    "Probability": prediction_proba
+
+    "Class":
+        model.classes_,
+
+    "Probability":
+        prediction_proba
+
 }).sort_values(
     "Probability",
     ascending=False
@@ -504,9 +786,10 @@ st.header(
     f"{selected_model_name} — Performance Overview"
 )
 
+
 st.caption(
-    "Model performance and prediction results based on "
-    "the currently selected model."
+    "Model performance and prediction results "
+    "based on the currently selected model."
 )
 
 
@@ -516,25 +799,30 @@ st.caption(
 
 col1, col2, col3, col4, col5 = st.columns(5)
 
+
 col1.metric(
     "Accuracy",
     f"{accuracy:.2%}"
 )
+
 
 col2.metric(
     "F1 (Weighted)",
     f"{f1_weighted:.4f}"
 )
 
+
 col3.metric(
     "Precision (Weighted)",
     f"{precision_w:.4f}"
 )
 
+
 col4.metric(
     "Recall (Weighted)",
     f"{recall_w:.4f}"
 )
+
 
 col5.metric(
     "ROC-AUC (Macro)",
@@ -549,67 +837,89 @@ st.markdown("---")
 # PREDICTION RESULT
 # ============================================================
 
-st.subheader("Prediction Result")
+st.subheader(
+    "Prediction Result"
+)
+
 
 prediction_col1, prediction_col2 = st.columns(
     [1, 2]
 )
 
 
-# ------------------------------------------------------------
+# ============================================================
 # LEFT — PREDICTED CLASS
-# ------------------------------------------------------------
+# ============================================================
 
 with prediction_col1:
 
-    st.markdown("### Predicted Obesity Level")
+    st.markdown(
+        "### Predicted Obesity Level"
+    )
+
 
     st.success(
         f"## {prediction}"
     )
+
 
     st.metric(
         "Prediction Probability",
         f"{prediction_probability:.2%}"
     )
 
+
     st.caption(
-        f"Predicted using the {selected_model_name} model."
+        f"Predicted using the "
+        f"{selected_model_name} model."
     )
 
 
-# ------------------------------------------------------------
+# ============================================================
 # RIGHT — PROBABILITY DISTRIBUTION
-# ------------------------------------------------------------
+# ============================================================
 
 with prediction_col2:
 
-    st.markdown("### Class Probabilities")
+    st.markdown(
+        "### Class Probabilities"
+    )
+
 
     fig, ax = plt.subplots(
         figsize=(8, 4)
     )
 
+
     ax.barh(
         proba_df["Class"][::-1],
-        proba_df["Probability"][::-1],
-        color="steelblue"
+        proba_df["Probability"][::-1]
     )
+
 
     ax.set_xlabel(
         "Predicted Probability"
     )
+
 
     ax.set_xlim(
         0,
         1
     )
 
+
     plt.tight_layout()
 
-    st.pyplot(fig)
 
-    plt.close(fig)
+    st.pyplot(
+        fig
+    )
+
+
+    plt.close(
+        fig
+    )
+
     gc.collect()
 
 
@@ -619,7 +929,10 @@ with prediction_col2:
 
 st.markdown("---")
 
-st.subheader("Prediction Input Summary")
+st.subheader(
+    "Prediction Input Summary"
+)
+
 
 input_summary_col1, input_summary_col2, input_summary_col3 = (
     st.columns(3)
@@ -633,10 +946,12 @@ with input_summary_col1:
         f"{age} years"
     )
 
+
     st.metric(
         "Gender",
         gender
     )
+
 
     st.metric(
         "Height",
@@ -651,10 +966,12 @@ with input_summary_col2:
         f"{weight:.1f} kg"
     )
 
+
     st.metric(
         "BMI",
         f"{bmi:.2f}"
     )
+
 
     st.metric(
         "Family History",
@@ -669,10 +986,12 @@ with input_summary_col3:
         f"{faf:.1f}"
     )
 
+
     st.metric(
         "Water Consumption",
         f"{ch2o:.1f}"
     )
+
 
     st.metric(
         "Technology Usage",
@@ -687,101 +1006,164 @@ st.markdown("---")
 # MODEL COMPARISON
 # ============================================================
 
-st.header("Model Comparison")
-
-st.caption(
-    "Performance comparison across the classification models. "
-    "Models will be populated as their trained artifacts become available."
+st.header(
+    "Model Comparison"
 )
 
 
-# ------------------------------------------------------------
-# Helper function for model metrics
-# ------------------------------------------------------------
+st.caption(
+    "Performance comparison across the classification "
+    "models. Models will be populated as their trained "
+    "artifacts become available."
+)
 
-def calculate_model_metrics(model_name):
 
-    config = MODEL_REGISTRY[model_name]
+# ============================================================
+# HELPER FUNCTION FOR MODEL METRICS
+# ============================================================
 
-    if not config.get("available", False):
+def calculate_model_metrics(
+    model_name
+):
+
+    config = MODEL_REGISTRY[
+        model_name
+    ]
+
+
+    if not config.get(
+        "available",
+        False
+    ):
+
         return {
-            "Model": model_name,
-            "Accuracy": "Not Available",
-            "F1 (Weighted)": "Not Available",
-            "Precision (Weighted)": "Not Available",
-            "Recall (Weighted)": "Not Available",
-            "ROC-AUC (Macro)": "Not Available"
+
+            "Model":
+                model_name,
+
+            "Accuracy":
+                "Not Available",
+
+            "F1 (Weighted)":
+                "Not Available",
+
+            "Precision (Weighted)":
+                "Not Available",
+
+            "Recall (Weighted)":
+                "Not Available",
+
+            "ROC-AUC (Macro)":
+                "Not Available"
         }
+
 
     try:
 
-        loaded_model, loaded_X_test, loaded_y_test, loaded_y_pred, loaded_y_proba = (
-            load_artifacts(config)
-        )
-
-        loaded_classes = loaded_model.classes_
-
-        loaded_y_test_bin = label_binarize(
+        (
+            loaded_model,
+            loaded_features,
+            loaded_X_test,
             loaded_y_test,
-            classes=loaded_classes
+            loaded_y_pred,
+            loaded_y_proba
+        ) = load_artifacts(
+            config
         )
+
+
+        loaded_classes = (
+            loaded_model.classes_
+        )
+
+
+        loaded_y_test_bin = (
+            label_binarize(
+                loaded_y_test,
+                classes=loaded_classes
+            )
+        )
+
 
         return {
-            "Model": model_name,
 
-            "Accuracy": f"{accuracy_score(
-                loaded_y_test,
-                loaded_y_pred
-            ):.2%}",
+            "Model":
+                model_name,
 
-            "F1 (Weighted)": f"{f1_score(
-                loaded_y_test,
-                loaded_y_pred,
-                average='weighted'
-            ):.4f}",
+            "Accuracy":
+                f"{accuracy_score(
+                    loaded_y_test,
+                    loaded_y_pred
+                ):.2%}",
 
-            "Precision (Weighted)": f"{precision_score(
-                loaded_y_test,
-                loaded_y_pred,
-                average='weighted'
-            ):.4f}",
+            "F1 (Weighted)":
+                f"{f1_score(
+                    loaded_y_test,
+                    loaded_y_pred,
+                    average='weighted'
+                ):.4f}",
 
-            "Recall (Weighted)": f"{recall_score(
-                loaded_y_test,
-                loaded_y_pred,
-                average='weighted'
-            ):.4f}",
+            "Precision (Weighted)":
+                f"{precision_score(
+                    loaded_y_test,
+                    loaded_y_pred,
+                    average='weighted'
+                ):.4f}",
 
-            "ROC-AUC (Macro)": f"{roc_auc_score(
-                loaded_y_test_bin,
-                loaded_y_proba,
-                average='macro',
-                multi_class='ovr'
-            ):.4f}"
+            "Recall (Weighted)":
+                f"{recall_score(
+                    loaded_y_test,
+                    loaded_y_pred,
+                    average='weighted'
+                ):.4f}",
+
+            "ROC-AUC (Macro)":
+                f"{roc_auc_score(
+                    loaded_y_test_bin,
+                    loaded_y_proba,
+                    average='macro',
+                    multi_class='ovr'
+                ):.4f}"
         }
+
 
     except Exception:
 
         return {
-            "Model": model_name,
-            "Accuracy": "Error",
-            "F1 (Weighted)": "Error",
-            "Precision (Weighted)": "Error",
-            "Recall (Weighted)": "Error",
-            "ROC-AUC (Macro)": "Error"
+
+            "Model":
+                model_name,
+
+            "Accuracy":
+                "Error",
+
+            "F1 (Weighted)":
+                "Error",
+
+            "Precision (Weighted)":
+                "Error",
+
+            "Recall (Weighted)":
+                "Error",
+
+            "ROC-AUC (Macro)":
+                "Error"
         }
 
 
-# ------------------------------------------------------------
-# Generate comparison table
-# ------------------------------------------------------------
+# ============================================================
+# GENERATE COMPARISON TABLE
+# ============================================================
 
 comparison_rows = []
+
 
 for model_name in MODEL_REGISTRY.keys():
 
     comparison_rows.append(
-        calculate_model_metrics(model_name)
+        calculate_model_metrics(
+            model_name
+        )
     )
 
 
@@ -803,6 +1185,7 @@ st.dataframe(
 
 st.markdown("---")
 
+
 section = st.radio(
     "View Results",
     [
@@ -815,6 +1198,7 @@ section = st.radio(
     label_visibility="collapsed"
 )
 
+
 st.markdown("")
 
 
@@ -824,14 +1208,21 @@ st.markdown("")
 
 if section == "Confusion Matrix":
 
-    st.subheader("Confusion Matrix")
-
-    st.caption(
-        f"Confusion matrix for the {selected_model_name} model."
+    st.subheader(
+        "Confusion Matrix"
     )
 
+
+    st.caption(
+        f"Confusion matrix for the "
+        f"{selected_model_name} model."
+    )
+
+
     st.image(
-        selected_config["confusion_matrix_image"],
+        selected_config[
+            "confusion_matrix_image"
+        ],
         width="stretch"
     )
 
@@ -842,12 +1233,16 @@ if section == "Confusion Matrix":
 
 elif section == "Classification Report":
 
-    st.subheader("Classification Report")
+    st.subheader(
+        "Classification Report"
+    )
+
 
     st.caption(
-        "Detailed precision, recall, F1-score and support "
-        "for each obesity category."
+        "Detailed precision, recall, F1-score "
+        "and support for each obesity category."
     )
+
 
     report_dict = classification_report(
         y_test,
@@ -855,11 +1250,15 @@ elif section == "Classification Report":
         output_dict=True
     )
 
+
     report_df = (
-        pd.DataFrame(report_dict)
+        pd.DataFrame(
+            report_dict
+        )
         .transpose()
         .round(4)
     )
+
 
     st.dataframe(
         report_df,
@@ -873,39 +1272,61 @@ elif section == "Classification Report":
 
 elif section == "Feature Importance":
 
-    st.subheader("Feature Importance")
+    st.subheader(
+        "Feature Importance"
+    )
+
 
     st.caption(
         f"Feature importance generated for the "
         f"{selected_model_name} model."
     )
 
+
     st.image(
-        selected_config["feature_importance_image"],
+        selected_config[
+            "feature_importance_image"
+        ],
         width="stretch"
     )
 
-    if hasattr(model, "feature_importances_"):
+
+    if hasattr(
+        model,
+        "feature_importances_"
+    ):
 
         importances = pd.Series(
+
             model.feature_importances_,
-            index=X_test.columns
+
+            index=model_features
+
         ).sort_values(
             ascending=False
         )
 
-        top15 = importances.head(15)
+
+        top15 = (
+            importances
+            .head(15)
+        )
+
 
         feature_df = (
             top15
             .reset_index()
             .rename(
                 columns={
-                    "index": "Feature",
-                    0: "Importance"
+                    "index":
+                        "Feature",
+
+                    0:
+                        "Importance"
                 }
             )
         )
+
 
         st.dataframe(
             feature_df,
@@ -913,10 +1334,12 @@ elif section == "Feature Importance":
             hide_index=True
         )
 
+
     else:
 
         st.info(
-            "Feature importance is not available for this model."
+            "Feature importance is not available "
+            "for this model."
         )
 
 
@@ -926,103 +1349,33 @@ elif section == "Feature Importance":
 
 elif section == "ROC Curves":
 
-    st.subheader("ROC Curves")
+    st.subheader(
+        "ROC Curves"
+    )
+
 
     st.caption(
         f"One-vs-Rest ROC curves for the "
         f"{selected_model_name} model."
     )
 
+
     st.image(
-        selected_config["roc_curve_image"],
+        selected_config[
+            "roc_curve_image"
+        ],
         width="stretch"
     )
 
-st.write("Weight sent to model:", input_aligned["Weight"].iloc[0])
-prediction = model.predict(input_aligned)[0]
 
-st.write("=== DEBUG: MODEL INPUT ===")
-
-st.write("Age:", input_aligned["Age"].iloc[0])
-
-st.write("Height:", input_aligned["Height"].iloc[0])
-
-st.write("Weight:", input_aligned["Weight"].iloc[0])
-
-
-
-st.write("Full model input:")
-
-st.dataframe(input_aligned)
-
-st.write("=== DEBUG: TRAINING DATA RANGE ===")
-
-
-
-st.write(
-
-    "Weight range:",
-
-    X_test["Weight"].min(),
-
-    "to",
-
-    X_test["Weight"].max()
-
-)
-
-
-
-st.write(
-
-    "Height range:",
-
-    X_test["Height"].min(),
-
-    "to",
-
-    X_test["Height"].max()
-
-)
-
-
-
-st.write(
-
-    "Age range:",
-
-    X_test["Age"].min(),
-
-    "to",
-
-    X_test["Age"].max()
-
-)
-
-st.write("=== DEBUG: PREDICTION PROBABILITIES ===")
-
-
-
-for cls, prob in zip(model.classes_, prediction_proba):
-
-    st.write(f"{cls}: {prob:.4%}")
-
-st.write(X_test[["Height", "Weight", "Age"]].head(20))
-
-st.write(X_test["Height"].value_counts().head(20))
-print(df[["Age", "Height", "Weight"]].head(10))
-
-print(df[["Age", "Height", "Weight"]].describe())
-
-print(X_train_encoded[["Age", "Height", "Weight"]].head(10))
-
-print(X_train_encoded[["Age", "Height", "Weight"]].describe())
 # ============================================================
 # FOOTER
 # ============================================================
 
 st.markdown("---")
 
+
 st.caption(
-    "Obesity Levels dataset — UCI Machine Learning Repository"
+    "Obesity Levels dataset — "
+    "UCI Machine Learning Repository"
 )
