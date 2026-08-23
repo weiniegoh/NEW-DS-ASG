@@ -37,14 +37,6 @@ st.caption(
     "Eating Habits and Physical Condition"
 )
 
-st.write("Model expects these columns:")
-st.write(X_test.columns.tolist())
-
-st.write("Weight statistics:")
-st.write(X_test["Weight"].describe())
-
-st.write("250 kg input:")
-st.write(input_aligned[["Weight"]])
 
 # ============================================================
 # MODEL REGISTRY
