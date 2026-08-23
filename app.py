@@ -2,6 +2,7 @@
 Obesity Level Classification — Model Comparison Dashboard
 ============================================================
 Run with:
+
     streamlit run app.py
 """
 
@@ -57,21 +58,11 @@ MODEL_REGISTRY = {
 
         "available": True,
 
-        # ----------------------------------------------------
-        # MODEL
-        # ----------------------------------------------------
-
         "model_path":
             "models/random_forest_model.pkl",
 
-        # IMPORTANT:
-        # The training code saves this file inside data/
         "model_features_path":
             "data/model_features.pkl",
-
-        # ----------------------------------------------------
-        # TESTING ARTIFACTS
-        # ----------------------------------------------------
 
         "X_test_path":
             "data/X_test_encoded.pkl",
@@ -85,10 +76,6 @@ MODEL_REGISTRY = {
         "y_proba_path":
             "data/rf_y_pred_proba.pkl",
 
-        # ----------------------------------------------------
-        # IMAGES
-        # ----------------------------------------------------
-
         "confusion_matrix_image":
             "images/rf_confusion_matrix.png",
 
@@ -99,16 +86,13 @@ MODEL_REGISTRY = {
             "images/rf_roc_curves.png",
     },
 
-
     "K-Nearest Neighbours (KNN)": {
         "available": False,
     },
 
-
     "Logistic Regression": {
         "available": False,
     },
-
 
     "Gradient Boosting": {
         "available": False,
@@ -196,13 +180,12 @@ st.sidebar.subheader(
 )
 
 st.sidebar.caption(
-    "Enter an individual's information. "
-    "These inputs remain unchanged when switching models."
+    "Enter an individual's information."
 )
 
 
 # ============================================================
-# DEMOGRAPHIC & PHYSICAL INFORMATION
+# DEMOGRAPHIC & PHYSICAL
 # ============================================================
 
 st.sidebar.markdown(
@@ -264,6 +247,7 @@ family_history = st.sidebar.selectbox(
 # ============================================================
 
 bmi = weight / (height ** 2)
+
 
 st.sidebar.metric(
     "Calculated BMI",
@@ -407,7 +391,7 @@ mtrans = st.sidebar.selectbox(
 
 
 # ============================================================
-# CHECK WHETHER MODEL IS AVAILABLE
+# MODEL AVAILABILITY
 # ============================================================
 
 if not selected_config.get(
@@ -416,155 +400,31 @@ if not selected_config.get(
 ):
 
     st.info(
-        f"**{selected_model_name}** has not been imported yet. "
-        "The model will appear here once its trained model "
-        "and prediction artifacts are added."
-    )
-
-    st.header(
-        "Model Comparison"
-    )
-
-    comparison_data = {
-
-        "Model": [
-            "Random Forest",
-            "K-Nearest Neighbours (KNN)",
-            "Logistic Regression",
-            "Gradient Boosting"
-        ],
-
-        "Accuracy": [
-            "Available"
-            if MODEL_REGISTRY["Random Forest"]["available"]
-            else "Not Available",
-
-            "Not Available",
-            "Not Available",
-            "Not Available"
-        ],
-
-        "F1 (Weighted)": [
-            "Available"
-            if MODEL_REGISTRY["Random Forest"]["available"]
-            else "Not Available",
-
-            "Not Available",
-            "Not Available",
-            "Not Available"
-        ],
-
-        "Precision (Weighted)": [
-            "Available"
-            if MODEL_REGISTRY["Random Forest"]["available"]
-            else "Not Available",
-
-            "Not Available",
-            "Not Available",
-            "Not Available"
-        ],
-
-        "Recall (Weighted)": [
-            "Available"
-            if MODEL_REGISTRY["Random Forest"]["available"]
-            else "Not Available",
-
-            "Not Available",
-            "Not Available",
-            "Not Available"
-        ],
-
-        "ROC-AUC (Macro)": [
-            "Available"
-            if MODEL_REGISTRY["Random Forest"]["available"]
-            else "Not Available",
-
-            "Not Available",
-            "Not Available",
-            "Not Available"
-        ]
-    }
-
-    comparison_df = pd.DataFrame(
-        comparison_data
-    )
-
-    st.dataframe(
-        comparison_df,
-        width="stretch",
-        hide_index=True
+        f"**{selected_model_name}** has not been imported yet."
     )
 
     st.stop()
 
 
 # ============================================================
-# LOAD SELECTED MODEL
+# LOAD MODEL
 # ============================================================
 
-try:
-
-    (
-        model,
-        model_features,
-        X_test,
-        y_test,
-        y_pred,
-        y_proba
-    ) = load_artifacts(
-        selected_config
-    )
-
-except FileNotFoundError as e:
-
-    st.error(
-        "A required model file could not be found."
-    )
-
-    st.code(
-        str(e)
-    )
-
-    st.info(
-        "Check that your GitHub repository contains:\n\n"
-        "models/random_forest_model.pkl\n"
-        "data/model_features.pkl\n"
-        "data/X_test_encoded.pkl\n"
-        "data/y_test_flat.pkl\n"
-        "data/rf_y_pred.pkl\n"
-        "data/rf_y_pred_proba.pkl"
-    )
-
-    st.stop()
-
-except Exception as e:
-
-    st.error(
-        "The model files could not be loaded."
-    )
-
-    st.code(
-        str(e)
-    )
-
-    st.stop()
+(
+    model,
+    model_features,
+    X_test,
+    y_test,
+    y_pred,
+    y_proba
+) = load_artifacts(
+    selected_config
+)
 
 
 # ============================================================
 # VERIFY MODEL FEATURES
 # ============================================================
-
-if not isinstance(
-    model_features,
-    list
-):
-
-    st.error(
-        "model_features.pkl does not contain a feature list."
-    )
-
-    st.stop()
-
 
 if len(model_features) != len(
     model.feature_importances_
@@ -575,39 +435,7 @@ if len(model_features) != len(
         "model_features.pkl."
     )
 
-    st.write(
-        "Number of features in model:",
-        len(model.feature_importances_)
-    )
-
-    st.write(
-        "Number of features in model_features.pkl:",
-        len(model_features)
-    )
-
     st.stop()
-
-
-# ============================================================
-# DISPLAY MODEL FEATURE INFORMATION
-# ============================================================
-
-with st.expander(
-    "Model Feature Information"
-):
-
-    st.write(
-        "Number of training features:",
-        len(model_features)
-    )
-
-    st.write(
-        "Exact feature order used by model:"
-    )
-
-    st.code(
-        str(model_features)
-    )
 
 
 # ============================================================
@@ -624,7 +452,7 @@ y_test_binarized = label_binarize(
 
 
 # ============================================================
-# MODEL PERFORMANCE METRICS
+# MODEL PERFORMANCE
 # ============================================================
 
 accuracy = accuracy_score(
@@ -663,13 +491,10 @@ roc_auc_macro = roc_auc_score(
 
 
 # ============================================================
-# CREATE USER INPUT DATAFRAME
+# CREATE INPUT DATAFRAME
 # ============================================================
 
-input_dict = {
-
-    "Gender":
-        gender,
+input_data = {
 
     "Age":
         age,
@@ -680,29 +505,14 @@ input_dict = {
     "Weight":
         weight,
 
-    "family_history_with_overweight":
-        family_history,
-
-    "FAVC":
-        favc,
-
     "FCVC":
         fcvc,
 
     "NCP":
         ncp,
 
-    "CAEC":
-        caec,
-
-    "SMOKE":
-        smoke,
-
     "CH2O":
         ch2o,
-
-    "SCC":
-        scc,
 
     "FAF":
         faf,
@@ -710,71 +520,70 @@ input_dict = {
     "TUE":
         tue,
 
-    "CALC":
-        calc,
+    "Gender_Male":
+        1 if gender == "Male" else 0,
 
-    "MTRANS":
-        mtrans,
+    "family_history_with_overweight_yes":
+        1 if family_history == "yes" else 0,
+
+    "FAVC_yes":
+        1 if favc == "yes" else 0,
+
+    "CAEC_Frequently":
+        1 if caec == "Frequently" else 0,
+
+    "CAEC_Sometimes":
+        1 if caec == "Sometimes" else 0,
+
+    "CAEC_no":
+        1 if caec == "no" else 0,
+
+    "SMOKE_yes":
+        1 if smoke == "yes" else 0,
+
+    "SCC_yes":
+        1 if scc == "yes" else 0,
+
+    "CALC_Frequently":
+        1 if calc == "Frequently" else 0,
+
+    "CALC_Sometimes":
+        1 if calc == "Sometimes" else 0,
+
+    "CALC_no":
+        1 if calc == "no" else 0,
+
+    "MTRANS_Bike":
+        1 if mtrans == "Bike" else 0,
+
+    "MTRANS_Motorbike":
+        1 if mtrans == "Motorbike" else 0,
+
+    "MTRANS_Public_Transportation":
+        1 if mtrans == "Public_Transportation" else 0,
+
+    "MTRANS_Walking":
+        1 if mtrans == "Walking" else 0
 }
 
 
-input_df = pd.DataFrame(
-    [input_dict]
+input_aligned = pd.DataFrame(
+    [input_data]
 )
 
 
 # ============================================================
-# CATEGORICAL ENCODING
+# FORCE EXACT MODEL FEATURE ORDER
 # ============================================================
 
-categorical_columns = [
-
-    "Gender",
-
-    "family_history_with_overweight",
-
-    "FAVC",
-
-    "CAEC",
-
-    "SMOKE",
-
-    "SCC",
-
-    "CALC",
-
-    "MTRANS"
-]
-
-
-input_encoded = pd.get_dummies(
-    input_df,
-    columns=categorical_columns,
-    drop_first=True
-)
-
-
-# ============================================================
-# ALIGN INPUT WITH MODEL FEATURES
-# ============================================================
-
-input_aligned = input_encoded.reindex(
+input_aligned = input_aligned.reindex(
     columns=model_features,
     fill_value=0
 )
 
 
 # ============================================================
-# FORCE NUMERIC DATA
-# ============================================================
-
-input_aligned = input_aligned.astype(
-    float
-)
-
-
-# ============================================================
-# FINAL FEATURE COUNT CHECK
+# VERIFY INPUT
 # ============================================================
 
 if input_aligned.shape[1] != len(
@@ -782,10 +591,9 @@ if input_aligned.shape[1] != len(
 ):
 
     st.error(
-        f"Input feature mismatch. "
-        f"Model expects {len(model_features)} "
-        f"features but received "
-        f"{input_aligned.shape[1]}."
+        f"Feature mismatch: model expects "
+        f"{len(model_features)} features but "
+        f"received {input_aligned.shape[1]}."
     )
 
     st.stop()
@@ -811,7 +619,7 @@ prediction_probability = (
 
 
 # ============================================================
-# PROBABILITY DATAFRAME
+# PROBABILITY TABLE
 # ============================================================
 
 proba_df = pd.DataFrame({
@@ -829,16 +637,11 @@ proba_df = pd.DataFrame({
 
 
 # ============================================================
-# MAIN AREA — PERFORMANCE OVERVIEW
+# MAIN PERFORMANCE
 # ============================================================
 
 st.header(
     f"{selected_model_name} — Performance Overview"
-)
-
-st.caption(
-    "Model performance and prediction results based on "
-    "the currently selected model."
 )
 
 
@@ -896,10 +699,6 @@ prediction_col1, prediction_col2 = st.columns(
 )
 
 
-# ============================================================
-# PREDICTED CLASS
-# ============================================================
-
 with prediction_col1:
 
     st.markdown(
@@ -915,15 +714,6 @@ with prediction_col1:
         f"{prediction_probability:.2%}"
     )
 
-    st.caption(
-        f"Predicted using the "
-        f"{selected_model_name} model."
-    )
-
-
-# ============================================================
-# PROBABILITY DISTRIBUTION
-# ============================================================
 
 with prediction_col2:
 
@@ -955,9 +745,7 @@ with prediction_col2:
         fig
     )
 
-    plt.close(
-        fig
-    )
+    plt.close(fig)
 
     gc.collect()
 
@@ -973,12 +761,10 @@ st.subheader(
 )
 
 
-input_summary_col1, input_summary_col2, input_summary_col3 = (
-    st.columns(3)
-)
+c1, c2, c3 = st.columns(3)
 
 
-with input_summary_col1:
+with c1:
 
     st.metric(
         "Age",
@@ -996,7 +782,7 @@ with input_summary_col1:
     )
 
 
-with input_summary_col2:
+with c2:
 
     st.metric(
         "Weight",
@@ -1014,7 +800,7 @@ with input_summary_col2:
     )
 
 
-with input_summary_col3:
+with c3:
 
     st.metric(
         "Physical Activity",
@@ -1033,66 +819,23 @@ with input_summary_col3:
 
 
 # ============================================================
-# DEBUG / MODEL INPUT VERIFICATION
+# MODEL INPUT VERIFICATION
 # ============================================================
 
 with st.expander(
-    "Technical Prediction Verification"
+    "View Encoded Model Input"
 ):
 
     st.write(
-        "Input sent to model:"
+        "The following 23 features are sent directly "
+        "to the Random Forest model:"
     )
 
     st.dataframe(
         input_aligned,
-        hide_index=True
+        hide_index=True,
+        width="stretch"
     )
-
-    st.write(
-        "Model expects:",
-        len(model_features),
-        "features"
-    )
-
-    st.write(
-        "Input contains:",
-        input_aligned.shape[1],
-        "features"
-    )
-
-    st.write(
-        "Weight sent to model:",
-        input_aligned["Weight"].iloc[0]
-    )
-
-    st.write(
-        "Height sent to model:",
-        input_aligned["Height"].iloc[0]
-    )
-
-    st.write(
-        "Age sent to model:",
-        input_aligned["Age"].iloc[0]
-    )
-
-    st.write(
-        "BMI:",
-        bmi
-    )
-
-    st.write(
-        "Prediction probabilities:"
-    )
-
-    for cls, prob in zip(
-        model.classes_,
-        prediction_proba
-    ):
-
-        st.write(
-            f"{cls}: {prob:.4%}"
-        )
 
 
 # ============================================================
@@ -1105,16 +848,6 @@ st.header(
     "Model Comparison"
 )
 
-st.caption(
-    "Performance comparison across the classification "
-    "models. Models will be populated as their trained "
-    "artifacts become available."
-)
-
-
-# ============================================================
-# HELPER FUNCTION
-# ============================================================
 
 def calculate_model_metrics(
     model_name
@@ -1150,6 +883,7 @@ def calculate_model_metrics(
                 "Not Available"
         }
 
+
     try:
 
         (
@@ -1167,9 +901,11 @@ def calculate_model_metrics(
             loaded_model.classes_
         )
 
-        loaded_y_test_bin = label_binarize(
-            loaded_y_test,
-            classes=loaded_classes
+        loaded_y_test_bin = (
+            label_binarize(
+                loaded_y_test,
+                classes=loaded_classes
+            )
         )
 
         return {
@@ -1213,6 +949,7 @@ def calculate_model_metrics(
                 ):.4f}"
         }
 
+
     except Exception:
 
         return {
@@ -1237,13 +974,10 @@ def calculate_model_metrics(
         }
 
 
-# ============================================================
-# GENERATE COMPARISON TABLE
-# ============================================================
-
 comparison_rows = []
 
-for model_name in MODEL_REGISTRY.keys():
+
+for model_name in MODEL_REGISTRY:
 
     comparison_rows.append(
         calculate_model_metrics(
@@ -1294,11 +1028,6 @@ if section == "Confusion Matrix":
         "Confusion Matrix"
     )
 
-    st.caption(
-        f"Confusion matrix for the "
-        f"{selected_model_name} model."
-    )
-
     st.image(
         selected_config[
             "confusion_matrix_image"
@@ -1315,11 +1044,6 @@ elif section == "Classification Report":
 
     st.subheader(
         "Classification Report"
-    )
-
-    st.caption(
-        "Detailed precision, recall, F1-score and "
-        "support for each obesity category."
     )
 
     report_dict = classification_report(
@@ -1352,11 +1076,6 @@ elif section == "Feature Importance":
         "Feature Importance"
     )
 
-    st.caption(
-        f"Feature importance generated for the "
-        f"{selected_model_name} model."
-    )
-
     st.image(
         selected_config[
             "feature_importance_image"
@@ -1376,12 +1095,9 @@ elif section == "Feature Importance":
             ascending=False
         )
 
-        top15 = importances.head(
-            15
-        )
-
         feature_df = (
-            top15
+            importances
+            .head(15)
             .reset_index()
         )
 
@@ -1396,13 +1112,6 @@ elif section == "Feature Importance":
             hide_index=True
         )
 
-    else:
-
-        st.info(
-            "Feature importance is not available "
-            "for this model."
-        )
-
 
 # ============================================================
 # ROC CURVES
@@ -1412,11 +1121,6 @@ elif section == "ROC Curves":
 
     st.subheader(
         "ROC Curves"
-    )
-
-    st.caption(
-        f"One-vs-Rest ROC curves for the "
-        f"{selected_model_name} model."
     )
 
     st.image(
