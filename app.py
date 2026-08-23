@@ -73,9 +73,17 @@ MODEL_REGISTRY = {
             "images/rf_roc_curves.png",
     },
 
-    "K-Nearest Neighbours (KNN)": {
-        "available": False,
-    },
+"K-Nearest Neighbours (KNN)": {
+    "available": True,
+    "model_path": "models/knn_model.pkl",
+    "X_test_path": "data/X_test_encoded.pkl",
+    "y_test_path": "data/y_test_flat.pkl",
+    "y_pred_path": "data/knn_y_pred.pkl",
+    "y_proba_path": "data/knn_y_pred_proba.pkl",
+    "confusion_matrix_image": "images/knn_confusion_matrix.png",
+    "feature_importance_image": "images/knn_feature_importance.png",
+    "roc_curve_image": "images/knn_roc_curves.png",
+},
 
     "Logistic Regression": {
         "available": False,
