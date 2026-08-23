@@ -448,32 +448,35 @@ input_dict = {
 }
 
 
-input_df = pd.DataFrame([input_dict])
+# Build the encoded row manually — pd.get_dummies is unreliable on a
+# single row because drop_first drops whatever category is present,
+# regardless of which category it actually is.
+input_aligned = pd.DataFrame(0, index=[0], columns=X_test.columns)
 
+# Numeric columns — copy directly
+numeric_cols = ["Age", "Height", "Weight", "FCVC", "NCP", "CH2O", "FAF", "TUE"]
+for col in numeric_cols:
+    if col in input_aligned.columns:
+        input_aligned.at[0, col] = input_dict[col]
 
-categorical_columns = [
-    "Gender",
-    "family_history_with_overweight",
-    "FAVC",
-    "CAEC",
-    "SMOKE",
-    "SCC",
-    "CALC",
-    "MTRANS"
-]
+# Categorical columns — set the matching dummy column to 1.
+# If the dummy column doesn't exist in X_test.columns, that means this
+# value IS the training data's reference category, so leaving it at 0 is correct.
+categorical_map = {
+    "Gender": gender,
+    "family_history_with_overweight": family_history,
+    "FAVC": favc,
+    "CAEC": caec,
+    "SMOKE": smoke,
+    "SCC": scc,
+    "CALC": calc,
+    "MTRANS": mtrans,
+}
 
-
-input_encoded = pd.get_dummies(
-    input_df,
-    columns=categorical_columns,
-    drop_first=True
-)
-
-
-input_aligned = input_encoded.reindex(
-    columns=X_test.columns,
-    fill_value=0
-)
+for col, value in categorical_map.items():
+    dummy_col_name = f"{col}_{value}"
+    if dummy_col_name in input_aligned.columns:
+        input_aligned.at[0, dummy_col_name] = 1
 
 # ============================================================
 # TEMPORARY DIAGNOSTIC — remove once the bug is found
