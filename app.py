@@ -475,6 +475,15 @@ input_aligned = input_encoded.reindex(
     fill_value=0
 )
 
+# ============================================================
+# TEMPORARY DIAGNOSTIC — remove once the bug is found
+# ============================================================
+with st.expander("🔍 Diagnostic: input values being fed to the model", expanded=True):
+    st.write("**Your input, after encoding/alignment (what the model actually sees):**")
+    st.dataframe(input_aligned[["Height", "Weight", "Age"]] if "Height" in input_aligned.columns else input_aligned)
+
+    st.write("**Training data's Height/Weight range (X_test), for comparison:**")
+    st.write(X_test[["Height", "Weight"]].describe())
 
 prediction = model.predict(
     input_aligned
