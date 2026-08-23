@@ -1010,6 +1010,13 @@ for cls, prob in zip(model.classes_, prediction_proba):
 st.write(X_test[["Height", "Weight", "Age"]].head(20))
 
 st.write(X_test["Height"].value_counts().head(20))
+print(df[["Age", "Height", "Weight"]].head(10))
+
+print(df[["Age", "Height", "Weight"]].describe())
+
+print(X_train_encoded[["Age", "Height", "Weight"]].head(10))
+
+print(X_train_encoded[["Age", "Height", "Weight"]].describe())
 # ============================================================
 # FOOTER
 # ============================================================
