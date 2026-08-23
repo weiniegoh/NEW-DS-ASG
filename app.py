@@ -14,6 +14,7 @@ import seaborn as sns
 import joblib
 import os
 import gc
+import xgboost as xgb
 
 from sklearn.metrics import (
     accuracy_score, f1_score, precision_score, recall_score,
