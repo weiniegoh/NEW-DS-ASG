@@ -17,7 +17,7 @@ import gc
 
 from sklearn.metrics import (
     accuracy_score, f1_score, precision_score, recall_score,
-    classification_report, confusion_matrix, roc_auc_score
+    classification_report, roc_auc_score
 )
 from sklearn.preprocessing import label_binarize
 
@@ -40,47 +40,60 @@ st.caption(
 
 # ============================================================
 # MODEL REGISTRY
-# ------------------------------------------------------------
-# Add each new model here once it's trained & saved.
+# ============================================================
+# Add each new model here once its files are available.
+#
+# For models that are not ready yet, keep:
+#     "available": False
+#
+# Once the model is ready, change it to:
+#     "available": True
+#
+# and provide the required file paths.
 # ============================================================
 
 MODEL_REGISTRY = {
 
     "Random Forest": {
+        "available": True,
+
         "model_path": "models/random_forest_model.pkl",
         "X_test_path": "data/X_test_encoded.pkl",
         "y_test_path": "data/y_test_flat.pkl",
         "y_pred_path": "data/rf_y_pred.pkl",
         "y_proba_path": "data/rf_y_pred_proba.pkl",
 
-        "confusion_matrix_image": "images/rf_confusion_matrix.png",
-        "feature_importance_image": "images/rf_feature_importance.png",
-        "roc_curve_image": "images/rf_roc_curves.png",
+        "confusion_matrix_image":
+            "images/rf_confusion_matrix.png",
+
+        "feature_importance_image":
+            "images/rf_feature_importance.png",
+
+        "roc_curve_image":
+            "images/rf_roc_curves.png",
     },
 
-    # "Decision Tree": {
-    #     "model_path": "models/decision_tree_model.pkl",
-    #     "X_test_path": "data/X_test_encoded.pkl",
-    #     "y_test_path": "data/y_test_flat.pkl",
-    #     "y_pred_path": "data/dt_y_pred.pkl",
-    #     "y_proba_path": "data/dt_y_pred_proba.pkl",
-    #
-    #     "confusion_matrix_image": "images/dt_confusion_matrix.png",
-    #     "feature_importance_image": "images/dt_feature_importance.png",
-    #     "roc_curve_image": "images/dt_roc_curves.png",
-    # },
+    "Decision Tree": {
+        "available": False,
+    },
 
-    # "Logistic Regression": {...},
-    # "Gradient Boosting": {...},
+    "Logistic Regression": {
+        "available": False,
+    },
+
+    "Gradient Boosting": {
+        "available": False,
+    },
 }
 
 
 # ============================================================
-# LOAD SELECTED MODEL
+# LOAD MODEL ARTIFACTS
 # ============================================================
 
 @st.cache_resource
 def load_artifacts(config):
+
     model = joblib.load(config["model_path"])
     X_test = joblib.load(config["X_test_path"])
     y_test = joblib.load(config["y_test_path"])
@@ -96,9 +109,12 @@ def load_artifacts(config):
 
 st.sidebar.header("Dashboard Controls")
 
-# ------------------------------------------------------------
-# Model Selection
-# ------------------------------------------------------------
+
+# ============================================================
+# MODEL SELECTION
+# ============================================================
+
+st.sidebar.subheader("Model Selection")
 
 selected_model_name = st.sidebar.selectbox(
     "Select Model",
@@ -106,23 +122,24 @@ selected_model_name = st.sidebar.selectbox(
     key="selected_model"
 )
 
+selected_config = MODEL_REGISTRY[selected_model_name]
+
+
+# ============================================================
+# PREDICTION INPUTS
+# ============================================================
+
 st.sidebar.markdown("---")
-
-
-# ------------------------------------------------------------
-# Prediction Inputs
-# ------------------------------------------------------------
-
 st.sidebar.subheader("Prediction Inputs")
 
 st.sidebar.caption(
     "Enter an individual's information. "
-    "The same inputs are automatically used when switching models."
+    "These inputs remain unchanged when switching models."
 )
 
 
 # ------------------------------------------------------------
-# Demographic & Physical Information
+# DEMOGRAPHIC & PHYSICAL INFORMATION
 # ------------------------------------------------------------
 
 st.sidebar.markdown("**Demographic & Physical Information**")
@@ -167,7 +184,19 @@ family_history = st.sidebar.selectbox(
 
 
 # ------------------------------------------------------------
-# Eating Habits
+# BMI
+# ------------------------------------------------------------
+
+bmi = weight / (height ** 2)
+
+st.sidebar.metric(
+    "Calculated BMI",
+    f"{bmi:.2f}"
+)
+
+
+# ------------------------------------------------------------
+# EATING HABITS
 # ------------------------------------------------------------
 
 st.sidebar.markdown("**Eating Habits**")
@@ -225,7 +254,7 @@ calc = st.sidebar.selectbox(
 
 
 # ------------------------------------------------------------
-# Lifestyle
+# LIFESTYLE
 # ------------------------------------------------------------
 
 st.sidebar.markdown("**Lifestyle**")
@@ -268,15 +297,87 @@ mtrans = st.sidebar.selectbox(
 
 
 # ============================================================
-# LOAD SELECTED MODEL'S ARTIFACTS
+# CHECK WHETHER MODEL IS AVAILABLE
 # ============================================================
 
-config = MODEL_REGISTRY[selected_model_name]
+if not selected_config.get("available", False):
 
-model, X_test, y_test, y_pred, y_proba = load_artifacts(config)
+    st.info(
+        f"**{selected_model_name}** has not been imported yet. "
+        "The model will appear here once its trained model and "
+        "prediction artifacts are added."
+    )
+
+    # --------------------------------------------------------
+    # MODEL COMPARISON TABLE STILL SHOWN
+    # --------------------------------------------------------
+
+    st.header("Model Comparison")
+
+    comparison_data = {
+        "Model": [
+            "Random Forest",
+            "Decision Tree",
+            "Logistic Regression",
+            "Gradient Boosting"
+        ],
+        "Accuracy": [
+            "87.24%" if MODEL_REGISTRY["Random Forest"]["available"]
+            else "Not Available",
+            "Not Available",
+            "Not Available",
+            "Not Available"
+        ],
+        "F1 (Weighted)": [
+            "0.8732" if MODEL_REGISTRY["Random Forest"]["available"]
+            else "Not Available",
+            "Not Available",
+            "Not Available",
+            "Not Available"
+        ],
+        "Precision (Weighted)": [
+            "Available" if MODEL_REGISTRY["Random Forest"]["available"]
+            else "Not Available",
+            "Not Available",
+            "Not Available",
+            "Not Available"
+        ],
+        "Recall (Weighted)": [
+            "Available" if MODEL_REGISTRY["Random Forest"]["available"]
+            else "Not Available",
+            "Not Available",
+            "Not Available",
+            "Not Available"
+        ],
+        "ROC-AUC (Macro)": [
+            "Available" if MODEL_REGISTRY["Random Forest"]["available"]
+            else "Not Available",
+            "Not Available",
+            "Not Available",
+            "Not Available"
+        ]
+    }
+
+    comparison_df = pd.DataFrame(comparison_data)
+
+    st.dataframe(
+        comparison_df,
+        width="stretch",
+        hide_index=True
+    )
+
+    st.stop()
+
+
+# ============================================================
+# LOAD SELECTED MODEL
+# ============================================================
+
+model, X_test, y_test, y_pred, y_proba = load_artifacts(
+    selected_config
+)
 
 class_names = model.classes_
-n_classes = len(class_names)
 
 y_test_binarized = label_binarize(
     y_test,
@@ -285,73 +386,13 @@ y_test_binarized = label_binarize(
 
 
 # ============================================================
-# LIVE PREDICTION
-# ------------------------------------------------------------
-# Prediction automatically updates whenever the sidebar
-# inputs or selected model changes.
+# MODEL PERFORMANCE METRICS
 # ============================================================
 
-input_dict = {
-    "Gender": gender,
-    "Age": age,
-    "Height": height,
-    "Weight": weight,
-    "family_history_with_overweight": family_history,
-    "FAVC": favc,
-    "FCVC": fcvc,
-    "NCP": ncp,
-    "CAEC": caec,
-    "SMOKE": smoke,
-    "CH2O": ch2o,
-    "SCC": scc,
-    "FAF": faf,
-    "TUE": tue,
-    "CALC": calc,
-    "MTRANS": mtrans,
-}
-
-input_df = pd.DataFrame([input_dict])
-
-categorical_columns = [
-    "Gender",
-    "family_history_with_overweight",
-    "FAVC",
-    "CAEC",
-    "SMOKE",
-    "SCC",
-    "CALC",
-    "MTRANS"
-]
-
-input_encoded = pd.get_dummies(
-    input_df,
-    columns=categorical_columns,
-    drop_first=True
+accuracy = accuracy_score(
+    y_test,
+    y_pred
 )
-
-input_aligned = input_encoded.reindex(
-    columns=X_test.columns,
-    fill_value=0
-)
-
-prediction = model.predict(input_aligned)[0]
-
-prediction_proba = model.predict_proba(input_aligned)[0]
-
-proba_df = pd.DataFrame({
-    "Class": model.classes_,
-    "Probability": prediction_proba
-}).sort_values(
-    "Probability",
-    ascending=False
-)
-
-
-# ============================================================
-# KEY METRICS
-# ============================================================
-
-accuracy = accuracy_score(y_test, y_pred)
 
 f1_weighted = f1_score(
     y_test,
@@ -380,19 +421,99 @@ roc_auc_macro = roc_auc_score(
 
 
 # ============================================================
-# MAIN AREA — PERFORMANCE OVERVIEW
+# PREDICTION
 # ============================================================
 
-st.header(f"{selected_model_name} — Performance Overview")
+input_dict = {
 
-st.caption(
-    "Model performance and prediction results based on the "
-    "currently selected model and prediction inputs."
+    "Gender": gender,
+    "Age": age,
+    "Height": height,
+    "Weight": weight,
+
+    "family_history_with_overweight":
+        family_history,
+
+    "FAVC": favc,
+    "FCVC": fcvc,
+    "NCP": ncp,
+    "CAEC": caec,
+    "SMOKE": smoke,
+    "CH2O": ch2o,
+    "SCC": scc,
+    "FAF": faf,
+    "TUE": tue,
+    "CALC": calc,
+    "MTRANS": mtrans,
+}
+
+
+input_df = pd.DataFrame([input_dict])
+
+
+categorical_columns = [
+    "Gender",
+    "family_history_with_overweight",
+    "FAVC",
+    "CAEC",
+    "SMOKE",
+    "SCC",
+    "CALC",
+    "MTRANS"
+]
+
+
+input_encoded = pd.get_dummies(
+    input_df,
+    columns=categorical_columns,
+    drop_first=True
+)
+
+
+input_aligned = input_encoded.reindex(
+    columns=X_test.columns,
+    fill_value=0
+)
+
+
+prediction = model.predict(
+    input_aligned
+)[0]
+
+
+prediction_proba = model.predict_proba(
+    input_aligned
+)[0]
+
+
+prediction_confidence = prediction_proba.max()
+
+
+proba_df = pd.DataFrame({
+    "Class": model.classes_,
+    "Probability": prediction_proba
+}).sort_values(
+    "Probability",
+    ascending=False
 )
 
 
 # ============================================================
-# METRIC CARDS
+# MAIN AREA — PERFORMANCE OVERVIEW
+# ============================================================
+
+st.header(
+    f"{selected_model_name} — Performance Overview"
+)
+
+st.caption(
+    "Model performance and prediction results based on "
+    "the currently selected model."
+)
+
+
+# ============================================================
+# PERFORMANCE METRICS
 # ============================================================
 
 col1, col2, col3, col4, col5 = st.columns(5)
@@ -432,8 +553,14 @@ st.markdown("---")
 
 st.subheader("Prediction Result")
 
-prediction_col1, prediction_col2 = st.columns([1, 2])
+prediction_col1, prediction_col2 = st.columns(
+    [1, 2]
+)
 
+
+# ------------------------------------------------------------
+# LEFT — PREDICTED CLASS
+# ------------------------------------------------------------
 
 with prediction_col1:
 
@@ -443,16 +570,27 @@ with prediction_col1:
         f"## {prediction}"
     )
 
-    st.caption(
-        f"Prediction generated using the {selected_model_name} model."
+    st.metric(
+        "Prediction Confidence",
+        f"{prediction_confidence:.2%}"
     )
 
+    st.caption(
+        f"Predicted using the {selected_model_name} model."
+    )
+
+
+# ------------------------------------------------------------
+# RIGHT — PROBABILITY DISTRIBUTION
+# ------------------------------------------------------------
 
 with prediction_col2:
 
     st.markdown("### Class Probabilities")
 
-    fig, ax = plt.subplots(figsize=(8, 4))
+    fig, ax = plt.subplots(
+        figsize=(8, 4)
+    )
 
     ax.barh(
         proba_df["Class"][::-1],
@@ -460,8 +598,14 @@ with prediction_col2:
         color="steelblue"
     )
 
-    ax.set_xlabel("Predicted Probability")
-    ax.set_xlim(0, 1)
+    ax.set_xlabel(
+        "Predicted Probability"
+    )
+
+    ax.set_xlim(
+        0,
+        1
+    )
 
     plt.tight_layout()
 
@@ -471,12 +615,195 @@ with prediction_col2:
     gc.collect()
 
 
+# ============================================================
+# INPUT SUMMARY
+# ============================================================
+
+st.markdown("---")
+
+st.subheader("Prediction Input Summary")
+
+input_summary_col1, input_summary_col2, input_summary_col3 = (
+    st.columns(3)
+)
+
+
+with input_summary_col1:
+
+    st.metric(
+        "Age",
+        f"{age} years"
+    )
+
+    st.metric(
+        "Gender",
+        gender
+    )
+
+    st.metric(
+        "Height",
+        f"{height:.2f} m"
+    )
+
+
+with input_summary_col2:
+
+    st.metric(
+        "Weight",
+        f"{weight:.1f} kg"
+    )
+
+    st.metric(
+        "BMI",
+        f"{bmi:.2f}"
+    )
+
+    st.metric(
+        "Family History",
+        family_history
+    )
+
+
+with input_summary_col3:
+
+    st.metric(
+        "Physical Activity",
+        f"{faf:.1f}"
+    )
+
+    st.metric(
+        "Water Consumption",
+        f"{ch2o:.1f}"
+    )
+
+    st.metric(
+        "Technology Usage",
+        f"{tue:.1f}"
+    )
+
+
 st.markdown("---")
 
 
 # ============================================================
-# SECTION SELECTOR
+# MODEL COMPARISON
 # ============================================================
+
+st.header("Model Comparison")
+
+st.caption(
+    "Performance comparison across the classification models. "
+    "Models will be populated as their trained artifacts become available."
+)
+
+
+# ------------------------------------------------------------
+# Helper function for model metrics
+# ------------------------------------------------------------
+
+def calculate_model_metrics(model_name):
+
+    config = MODEL_REGISTRY[model_name]
+
+    if not config.get("available", False):
+        return {
+            "Model": model_name,
+            "Accuracy": "Not Available",
+            "F1 (Weighted)": "Not Available",
+            "Precision (Weighted)": "Not Available",
+            "Recall (Weighted)": "Not Available",
+            "ROC-AUC (Macro)": "Not Available"
+        }
+
+    try:
+
+        loaded_model, loaded_X_test, loaded_y_test, loaded_y_pred, loaded_y_proba = (
+            load_artifacts(config)
+        )
+
+        loaded_classes = loaded_model.classes_
+
+        loaded_y_test_bin = label_binarize(
+            loaded_y_test,
+            classes=loaded_classes
+        )
+
+        return {
+            "Model": model_name,
+
+            "Accuracy": f"{accuracy_score(
+                loaded_y_test,
+                loaded_y_pred
+            ):.2%}",
+
+            "F1 (Weighted)": f"{f1_score(
+                loaded_y_test,
+                loaded_y_pred,
+                average='weighted'
+            ):.4f}",
+
+            "Precision (Weighted)": f"{precision_score(
+                loaded_y_test,
+                loaded_y_pred,
+                average='weighted'
+            ):.4f}",
+
+            "Recall (Weighted)": f"{recall_score(
+                loaded_y_test,
+                loaded_y_pred,
+                average='weighted'
+            ):.4f}",
+
+            "ROC-AUC (Macro)": f"{roc_auc_score(
+                loaded_y_test_bin,
+                loaded_y_proba,
+                average='macro',
+                multi_class='ovr'
+            ):.4f}"
+        }
+
+    except Exception:
+
+        return {
+            "Model": model_name,
+            "Accuracy": "Error",
+            "F1 (Weighted)": "Error",
+            "Precision (Weighted)": "Error",
+            "Recall (Weighted)": "Error",
+            "ROC-AUC (Macro)": "Error"
+        }
+
+
+# ------------------------------------------------------------
+# Generate comparison table
+# ------------------------------------------------------------
+
+comparison_rows = []
+
+for model_name in MODEL_REGISTRY.keys():
+
+    comparison_rows.append(
+        calculate_model_metrics(model_name)
+    )
+
+
+comparison_df = pd.DataFrame(
+    comparison_rows
+)
+
+
+st.dataframe(
+    comparison_df,
+    width="stretch",
+    hide_index=True
+)
+
+
+# ============================================================
+# RESULTS NAVIGATION
+# ============================================================
+
+st.markdown("---")
 
 section = st.radio(
     "View Results",
@@ -506,7 +833,7 @@ if section == "Confusion Matrix":
     )
 
     st.image(
-        config["confusion_matrix_image"],
+        selected_config["confusion_matrix_image"],
         width="stretch"
     )
 
@@ -518,6 +845,11 @@ if section == "Confusion Matrix":
 elif section == "Classification Report":
 
     st.subheader("Classification Report")
+
+    st.caption(
+        "Detailed precision, recall, F1-score and support "
+        "for each obesity category."
+    )
 
     report_dict = classification_report(
         y_test,
@@ -545,8 +877,13 @@ elif section == "Feature Importance":
 
     st.subheader("Feature Importance")
 
+    st.caption(
+        f"Feature importance generated for the "
+        f"{selected_model_name} model."
+    )
+
     st.image(
-        config["feature_importance_image"],
+        selected_config["feature_importance_image"],
         width="stretch"
     )
 
@@ -574,7 +911,14 @@ elif section == "Feature Importance":
 
         st.dataframe(
             feature_df,
-            width="stretch"
+            width="stretch",
+            hide_index=True
+        )
+
+    else:
+
+        st.info(
+            "Feature importance is not available for this model."
         )
 
 
@@ -587,11 +931,12 @@ elif section == "ROC Curves":
     st.subheader("ROC Curves")
 
     st.caption(
-        f"One-vs-Rest ROC curves for the {selected_model_name} model."
+        f"One-vs-Rest ROC curves for the "
+        f"{selected_model_name} model."
     )
 
     st.image(
-        config["roc_curve_image"],
+        selected_config["roc_curve_image"],
         width="stretch"
     )
 
