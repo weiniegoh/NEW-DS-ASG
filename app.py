@@ -948,6 +948,3 @@ st.markdown("---")
 st.caption(
     "Obesity Levels dataset — UCI Machine Learning Repository"
 )
-
-duplicate_count = df_clean.duplicated().sum()
-print("Number of duplicate records: ", duplicate_count)
