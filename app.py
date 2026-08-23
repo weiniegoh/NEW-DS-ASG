@@ -451,7 +451,7 @@ input_dict = {
 # Build the encoded row manually — pd.get_dummies is unreliable on a
 # single row because drop_first drops whatever category is present,
 # regardless of which category it actually is.
-input_aligned = pd.DataFrame(0, index=[0], columns=X_test.columns)
+input_aligned = pd.DataFrame(0.0, index=[0], columns=X_test.columns)
 
 # Numeric columns — copy directly
 numeric_cols = ["Age", "Height", "Weight", "FCVC", "NCP", "CH2O", "FAF", "TUE"]
@@ -476,7 +476,7 @@ categorical_map = {
 for col, value in categorical_map.items():
     dummy_col_name = f"{col}_{value}"
     if dummy_col_name in input_aligned.columns:
-        input_aligned.at[0, dummy_col_name] = 1
+        input_aligned.at[0, dummy_col_name] = 1.0
 
 # ============================================================
 # TEMPORARY DIAGNOSTIC — remove once the bug is found
