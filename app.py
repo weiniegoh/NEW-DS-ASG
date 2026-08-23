@@ -939,6 +939,73 @@ elif section == "ROC Curves":
     )
 
 st.write("Weight sent to model:", input_aligned["Weight"].iloc[0])
+prediction = model.predict(input_aligned)[0]
+
+st.write("=== DEBUG: MODEL INPUT ===")
+
+st.write("Age:", input_aligned["Age"].iloc[0])
+
+st.write("Height:", input_aligned["Height"].iloc[0])
+
+st.write("Weight:", input_aligned["Weight"].iloc[0])
+
+
+
+st.write("Full model input:")
+
+st.dataframe(input_aligned)
+
+st.write("=== DEBUG: TRAINING DATA RANGE ===")
+
+
+
+st.write(
+
+    "Weight range:",
+
+    X_test["Weight"].min(),
+
+    "to",
+
+    X_test["Weight"].max()
+
+)
+
+
+
+st.write(
+
+    "Height range:",
+
+    X_test["Height"].min(),
+
+    "to",
+
+    X_test["Height"].max()
+
+)
+
+
+
+st.write(
+
+    "Age range:",
+
+    X_test["Age"].min(),
+
+    "to",
+
+    X_test["Age"].max()
+
+)
+
+st.write("=== DEBUG: PREDICTION PROBABILITIES ===")
+
+
+
+for cls, prob in zip(model.classes_, prediction_proba):
+
+    st.write(f"{cls}: {prob:.4%}")
 # ============================================================
 # FOOTER
 # ============================================================
