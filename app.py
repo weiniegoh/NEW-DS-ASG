@@ -7,10 +7,13 @@ Run with: streamlit run app.py
 import streamlit as st
 import pandas as pd
 import numpy as np
+import matplotlib
+matplotlib.use("Agg")  # non-interactive backend, lower memory overhead on servers
 import matplotlib.pyplot as plt
 import seaborn as sns
 import joblib
 import os
+import gc
 from itertools import cycle
 
 from sklearn.metrics import (
@@ -203,6 +206,7 @@ if section == "Predict":
         ax.set_xlim(0, 1)
         st.pyplot(fig)
         plt.close(fig)
+        gc.collect()
 
 # ---- SECTION: Confusion Matrix ----
 elif section == "Confusion Matrix":
@@ -220,6 +224,7 @@ elif section == "Confusion Matrix":
         plt.xticks(rotation=45, ha="right")
         st.pyplot(fig)
         plt.close(fig)
+        gc.collect()
     with c2:
         fig, ax = plt.subplots(figsize=(6, 5))
         sns.heatmap(cm_pct, annot=True, fmt=".1f", cmap="Blues",
@@ -230,6 +235,7 @@ elif section == "Confusion Matrix":
         plt.xticks(rotation=45, ha="right")
         st.pyplot(fig)
         plt.close(fig)
+        gc.collect()
 
 # ---- SECTION: Classification Report ----
 elif section == "Classification Report":
@@ -251,6 +257,7 @@ elif section == "Feature Importance":
         ax.set_title("Top 15 Feature Importances")
         st.pyplot(fig)
         plt.close(fig)
+        gc.collect()
 
         st.dataframe(top15.reset_index().rename(
             columns={"index": "Feature", 0: "Importance"}
@@ -286,6 +293,7 @@ elif section == "ROC Curves":
 
     st.pyplot(fig)
     plt.close(fig)
+    gc.collect()
 
 st.markdown("---")
 st.caption("Obesity Levels dataset — UCI Machine Learning Repository")
