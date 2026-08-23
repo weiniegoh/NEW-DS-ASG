@@ -37,7 +37,9 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("Obesity Level Classification — Model Comparison")
+st.title(
+    "Obesity Level Classification — Model Comparison"
+)
 
 st.caption(
     "CRISP-DM Project | Estimation of Obesity Levels Based on "
@@ -63,9 +65,9 @@ MODEL_REGISTRY = {
             "models/random_forest_model.pkl",
 
         # IMPORTANT:
-        # Exact 23 features used during model training
+        # The training code saves this file inside data/
         "model_features_path":
-            "models/model_features.pkl",
+            "data/model_features.pkl",
 
         # ----------------------------------------------------
         # TESTING ARTIFACTS
@@ -99,19 +101,16 @@ MODEL_REGISTRY = {
 
 
     "K-Nearest Neighbours (KNN)": {
-
         "available": False,
     },
 
 
     "Logistic Regression": {
-
         "available": False,
     },
 
 
     "Gradient Boosting": {
-
         "available": False,
     },
 }
@@ -127,10 +126,6 @@ def load_artifacts(config):
     model = joblib.load(
         config["model_path"]
     )
-
-    # --------------------------------------------------------
-    # Load exact feature order used during training
-    # --------------------------------------------------------
 
     model_features = joblib.load(
         config["model_features_path"]
@@ -166,14 +161,18 @@ def load_artifacts(config):
 # SIDEBAR
 # ============================================================
 
-st.sidebar.header("Dashboard Controls")
+st.sidebar.header(
+    "Dashboard Controls"
+)
 
 
 # ============================================================
 # MODEL SELECTION
 # ============================================================
 
-st.sidebar.subheader("Model Selection")
+st.sidebar.subheader(
+    "Model Selection"
+)
 
 selected_model_name = st.sidebar.selectbox(
     "Select Model",
@@ -417,21 +416,14 @@ if not selected_config.get(
 ):
 
     st.info(
-        f"**{selected_model_name}** has not been "
-        "imported yet. The model will appear here "
-        "once its trained model and prediction "
-        "artifacts are added."
+        f"**{selected_model_name}** has not been imported yet. "
+        "The model will appear here once its trained model "
+        "and prediction artifacts are added."
     )
-
-
-    # --------------------------------------------------------
-    # MODEL COMPARISON
-    # --------------------------------------------------------
 
     st.header(
         "Model Comparison"
     )
-
 
     comparison_data = {
 
@@ -443,11 +435,8 @@ if not selected_config.get(
         ],
 
         "Accuracy": [
-
-            "87.24%"
-            if MODEL_REGISTRY[
-                "Random Forest"
-            ]["available"]
+            "Available"
+            if MODEL_REGISTRY["Random Forest"]["available"]
             else "Not Available",
 
             "Not Available",
@@ -456,11 +445,8 @@ if not selected_config.get(
         ],
 
         "F1 (Weighted)": [
-
-            "0.8732"
-            if MODEL_REGISTRY[
-                "Random Forest"
-            ]["available"]
+            "Available"
+            if MODEL_REGISTRY["Random Forest"]["available"]
             else "Not Available",
 
             "Not Available",
@@ -469,11 +455,8 @@ if not selected_config.get(
         ],
 
         "Precision (Weighted)": [
-
             "Available"
-            if MODEL_REGISTRY[
-                "Random Forest"
-            ]["available"]
+            if MODEL_REGISTRY["Random Forest"]["available"]
             else "Not Available",
 
             "Not Available",
@@ -482,11 +465,8 @@ if not selected_config.get(
         ],
 
         "Recall (Weighted)": [
-
             "Available"
-            if MODEL_REGISTRY[
-                "Random Forest"
-            ]["available"]
+            if MODEL_REGISTRY["Random Forest"]["available"]
             else "Not Available",
 
             "Not Available",
@@ -495,11 +475,8 @@ if not selected_config.get(
         ],
 
         "ROC-AUC (Macro)": [
-
             "Available"
-            if MODEL_REGISTRY[
-                "Random Forest"
-            ]["available"]
+            if MODEL_REGISTRY["Random Forest"]["available"]
             else "Not Available",
 
             "Not Available",
@@ -508,18 +485,15 @@ if not selected_config.get(
         ]
     }
 
-
     comparison_df = pd.DataFrame(
         comparison_data
     )
-
 
     st.dataframe(
         comparison_df,
         width="stretch",
         hide_index=True
     )
-
 
     st.stop()
 
@@ -528,21 +502,69 @@ if not selected_config.get(
 # LOAD SELECTED MODEL
 # ============================================================
 
-(
-    model,
-    model_features,
-    X_test,
-    y_test,
-    y_pred,
-    y_proba
-) = load_artifacts(
-    selected_config
-)
+try:
+
+    (
+        model,
+        model_features,
+        X_test,
+        y_test,
+        y_pred,
+        y_proba
+    ) = load_artifacts(
+        selected_config
+    )
+
+except FileNotFoundError as e:
+
+    st.error(
+        "A required model file could not be found."
+    )
+
+    st.code(
+        str(e)
+    )
+
+    st.info(
+        "Check that your GitHub repository contains:\n\n"
+        "models/random_forest_model.pkl\n"
+        "data/model_features.pkl\n"
+        "data/X_test_encoded.pkl\n"
+        "data/y_test_flat.pkl\n"
+        "data/rf_y_pred.pkl\n"
+        "data/rf_y_pred_proba.pkl"
+    )
+
+    st.stop()
+
+except Exception as e:
+
+    st.error(
+        "The model files could not be loaded."
+    )
+
+    st.code(
+        str(e)
+    )
+
+    st.stop()
 
 
 # ============================================================
 # VERIFY MODEL FEATURES
 # ============================================================
+
+if not isinstance(
+    model_features,
+    list
+):
+
+    st.error(
+        "model_features.pkl does not contain a feature list."
+    )
+
+    st.stop()
+
 
 if len(model_features) != len(
     model.feature_importances_
@@ -550,10 +572,42 @@ if len(model_features) != len(
 
     st.error(
         "Model feature count does not match "
-        "the feature list saved in model_features.pkl."
+        "model_features.pkl."
+    )
+
+    st.write(
+        "Number of features in model:",
+        len(model.feature_importances_)
+    )
+
+    st.write(
+        "Number of features in model_features.pkl:",
+        len(model_features)
     )
 
     st.stop()
+
+
+# ============================================================
+# DISPLAY MODEL FEATURE INFORMATION
+# ============================================================
+
+with st.expander(
+    "Model Feature Information"
+):
+
+    st.write(
+        "Number of training features:",
+        len(model_features)
+    )
+
+    st.write(
+        "Exact feature order used by model:"
+    )
+
+    st.code(
+        str(model_features)
+    )
 
 
 # ============================================================
@@ -703,23 +757,19 @@ input_encoded = pd.get_dummies(
 # ============================================================
 # ALIGN INPUT WITH MODEL FEATURES
 # ============================================================
-#
-# IMPORTANT:
-#
-# We use model_features.pkl instead of X_test.columns.
-#
-# This guarantees that:
-#
-# 1. The same 23 features are used
-# 2. The feature order is identical
-# 3. Missing dummy variables become 0
-# 4. Extra columns are removed
-#
-# ============================================================
 
 input_aligned = input_encoded.reindex(
     columns=model_features,
     fill_value=0
+)
+
+
+# ============================================================
+# FORCE NUMERIC DATA
+# ============================================================
+
+input_aligned = input_aligned.astype(
+    float
 )
 
 
@@ -786,10 +836,9 @@ st.header(
     f"{selected_model_name} — Performance Overview"
 )
 
-
 st.caption(
-    "Model performance and prediction results "
-    "based on the currently selected model."
+    "Model performance and prediction results based on "
+    "the currently selected model."
 )
 
 
@@ -848,7 +897,7 @@ prediction_col1, prediction_col2 = st.columns(
 
 
 # ============================================================
-# LEFT — PREDICTED CLASS
+# PREDICTED CLASS
 # ============================================================
 
 with prediction_col1:
@@ -857,17 +906,14 @@ with prediction_col1:
         "### Predicted Obesity Level"
     )
 
-
     st.success(
         f"## {prediction}"
     )
-
 
     st.metric(
         "Prediction Probability",
         f"{prediction_probability:.2%}"
     )
-
 
     st.caption(
         f"Predicted using the "
@@ -876,7 +922,7 @@ with prediction_col1:
 
 
 # ============================================================
-# RIGHT — PROBABILITY DISTRIBUTION
+# PROBABILITY DISTRIBUTION
 # ============================================================
 
 with prediction_col2:
@@ -885,36 +931,29 @@ with prediction_col2:
         "### Class Probabilities"
     )
 
-
     fig, ax = plt.subplots(
         figsize=(8, 4)
     )
-
 
     ax.barh(
         proba_df["Class"][::-1],
         proba_df["Probability"][::-1]
     )
 
-
     ax.set_xlabel(
         "Predicted Probability"
     )
-
 
     ax.set_xlim(
         0,
         1
     )
 
-
     plt.tight_layout()
-
 
     st.pyplot(
         fig
     )
-
 
     plt.close(
         fig
@@ -946,12 +985,10 @@ with input_summary_col1:
         f"{age} years"
     )
 
-
     st.metric(
         "Gender",
         gender
     )
-
 
     st.metric(
         "Height",
@@ -966,12 +1003,10 @@ with input_summary_col2:
         f"{weight:.1f} kg"
     )
 
-
     st.metric(
         "BMI",
         f"{bmi:.2f}"
     )
-
 
     st.metric(
         "Family History",
@@ -986,12 +1021,10 @@ with input_summary_col3:
         f"{faf:.1f}"
     )
 
-
     st.metric(
         "Water Consumption",
         f"{ch2o:.1f}"
     )
-
 
     st.metric(
         "Technology Usage",
@@ -999,17 +1032,78 @@ with input_summary_col3:
     )
 
 
-st.markdown("---")
+# ============================================================
+# DEBUG / MODEL INPUT VERIFICATION
+# ============================================================
+
+with st.expander(
+    "Technical Prediction Verification"
+):
+
+    st.write(
+        "Input sent to model:"
+    )
+
+    st.dataframe(
+        input_aligned,
+        hide_index=True
+    )
+
+    st.write(
+        "Model expects:",
+        len(model_features),
+        "features"
+    )
+
+    st.write(
+        "Input contains:",
+        input_aligned.shape[1],
+        "features"
+    )
+
+    st.write(
+        "Weight sent to model:",
+        input_aligned["Weight"].iloc[0]
+    )
+
+    st.write(
+        "Height sent to model:",
+        input_aligned["Height"].iloc[0]
+    )
+
+    st.write(
+        "Age sent to model:",
+        input_aligned["Age"].iloc[0]
+    )
+
+    st.write(
+        "BMI:",
+        bmi
+    )
+
+    st.write(
+        "Prediction probabilities:"
+    )
+
+    for cls, prob in zip(
+        model.classes_,
+        prediction_proba
+    ):
+
+        st.write(
+            f"{cls}: {prob:.4%}"
+        )
 
 
 # ============================================================
 # MODEL COMPARISON
 # ============================================================
 
+st.markdown("---")
+
 st.header(
     "Model Comparison"
 )
-
 
 st.caption(
     "Performance comparison across the classification "
@@ -1019,7 +1113,7 @@ st.caption(
 
 
 # ============================================================
-# HELPER FUNCTION FOR MODEL METRICS
+# HELPER FUNCTION
 # ============================================================
 
 def calculate_model_metrics(
@@ -1029,7 +1123,6 @@ def calculate_model_metrics(
     config = MODEL_REGISTRY[
         model_name
     ]
-
 
     if not config.get(
         "available",
@@ -1057,7 +1150,6 @@ def calculate_model_metrics(
                 "Not Available"
         }
 
-
     try:
 
         (
@@ -1071,19 +1163,14 @@ def calculate_model_metrics(
             config
         )
 
-
         loaded_classes = (
             loaded_model.classes_
         )
 
-
-        loaded_y_test_bin = (
-            label_binarize(
-                loaded_y_test,
-                classes=loaded_classes
-            )
+        loaded_y_test_bin = label_binarize(
+            loaded_y_test,
+            classes=loaded_classes
         )
-
 
         return {
 
@@ -1126,7 +1213,6 @@ def calculate_model_metrics(
                 ):.4f}"
         }
 
-
     except Exception:
 
         return {
@@ -1156,7 +1242,6 @@ def calculate_model_metrics(
 # ============================================================
 
 comparison_rows = []
-
 
 for model_name in MODEL_REGISTRY.keys():
 
@@ -1199,9 +1284,6 @@ section = st.radio(
 )
 
 
-st.markdown("")
-
-
 # ============================================================
 # CONFUSION MATRIX
 # ============================================================
@@ -1212,12 +1294,10 @@ if section == "Confusion Matrix":
         "Confusion Matrix"
     )
 
-
     st.caption(
         f"Confusion matrix for the "
         f"{selected_model_name} model."
     )
-
 
     st.image(
         selected_config[
@@ -1237,19 +1317,16 @@ elif section == "Classification Report":
         "Classification Report"
     )
 
-
     st.caption(
-        "Detailed precision, recall, F1-score "
-        "and support for each obesity category."
+        "Detailed precision, recall, F1-score and "
+        "support for each obesity category."
     )
-
 
     report_dict = classification_report(
         y_test,
         y_pred,
         output_dict=True
     )
-
 
     report_df = (
         pd.DataFrame(
@@ -1258,7 +1335,6 @@ elif section == "Classification Report":
         .transpose()
         .round(4)
     )
-
 
     st.dataframe(
         report_df,
@@ -1276,12 +1352,10 @@ elif section == "Feature Importance":
         "Feature Importance"
     )
 
-
     st.caption(
         f"Feature importance generated for the "
         f"{selected_model_name} model."
     )
-
 
     st.image(
         selected_config[
@@ -1290,50 +1364,37 @@ elif section == "Feature Importance":
         width="stretch"
     )
 
-
     if hasattr(
         model,
         "feature_importances_"
     ):
 
         importances = pd.Series(
-
             model.feature_importances_,
-
             index=model_features
-
         ).sort_values(
             ascending=False
         )
 
-
-        top15 = (
-            importances
-            .head(15)
+        top15 = importances.head(
+            15
         )
-
 
         feature_df = (
             top15
             .reset_index()
-            .rename(
-                columns={
-                    "index":
-                        "Feature",
-
-                    0:
-                        "Importance"
-                }
-            )
         )
 
+        feature_df.columns = [
+            "Feature",
+            "Importance"
+        ]
 
         st.dataframe(
             feature_df,
             width="stretch",
             hide_index=True
         )
-
 
     else:
 
@@ -1353,12 +1414,10 @@ elif section == "ROC Curves":
         "ROC Curves"
     )
 
-
     st.caption(
         f"One-vs-Rest ROC curves for the "
         f"{selected_model_name} model."
     )
-
 
     st.image(
         selected_config[
@@ -1373,7 +1432,6 @@ elif section == "ROC Curves":
 # ============================================================
 
 st.markdown("---")
-
 
 st.caption(
     "Obesity Levels dataset — "
