@@ -10,6 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import joblib
+import os
 from itertools import cycle
 
 from sklearn.metrics import (
@@ -28,6 +29,21 @@ st.set_page_config(
 
 st.title("Obesity Level Classification — Model Comparison")
 st.caption("CRISP-DM Project | Estimation of Obesity Levels Based on Eating Habits and Physical Condition")
+
+# ============================================================
+# DIAGNOSTIC — TEMPORARY, remove once file paths are confirmed working
+# ============================================================
+with st.expander("🔍 Diagnostic: Files visible to this app (click to expand)", expanded=True):
+    st.write("**Current working directory:**", os.getcwd())
+    st.write("**Contents of current directory:**")
+    st.code("\n".join(sorted(os.listdir("."))))
+
+    for folder in ["models", "data"]:
+        st.write(f"**Contents of `{folder}/`:**")
+        if os.path.isdir(folder):
+            st.code("\n".join(sorted(os.listdir(folder))))
+        else:
+            st.error(f"Folder '{folder}' does not exist in the working directory!")
 
 # ============================================================
 # MODEL REGISTRY
