@@ -6,9 +6,10 @@ Run:
     streamlit run app.py
 
 IMPORTANT:
-This version deliberately DOES NOT cache the Random Forest model.
-This prevents Streamlit from using an old cached model after the
-.pkl file has been replaced.
+- Uses the exact trained Random Forest model.
+- Uses the exact 23 training features.
+- Does NOT modify prediction probabilities.
+- Does NOT cache the model.
 """
 
 import streamlit as st
@@ -41,11 +42,12 @@ from sklearn.preprocessing import label_binarize
 
 st.set_page_config(
     page_title="Obesity Level Classification Dashboard",
+    page_icon="📊",
     layout="wide"
 )
 
 st.title(
-    "Obesity Level Classification — Model Comparison"
+    "Obesity Level Classification — Random Forest"
 )
 
 st.caption(
@@ -59,22 +61,44 @@ st.caption(
 # ============================================================
 
 MODEL_PATH = "models/random_forest_model.pkl"
-
 FEATURE_PATH = "data/model_features.pkl"
 
 X_TEST_PATH = "data/X_test_encoded.pkl"
-
 Y_TEST_PATH = "data/y_test_flat.pkl"
-
 Y_PRED_PATH = "data/rf_y_pred.pkl"
-
 Y_PROBA_PATH = "data/rf_y_pred_proba.pkl"
 
 CONFUSION_IMAGE = "images/rf_confusion_matrix.png"
-
 FEATURE_IMPORTANCE_IMAGE = "images/rf_feature_importance.png"
-
 ROC_IMAGE = "images/rf_roc_curves.png"
+
+
+# ============================================================
+# CHECK REQUIRED FILES
+# ============================================================
+
+required_files = [
+    MODEL_PATH,
+    FEATURE_PATH,
+    X_TEST_PATH,
+    Y_TEST_PATH,
+    Y_PRED_PATH,
+    Y_PROBA_PATH
+]
+
+missing_files = [
+    path for path in required_files
+    if not os.path.exists(path)
+]
+
+if missing_files:
+
+    st.error("Required model files are missing:")
+
+    for file in missing_files:
+        st.write(f"- `{file}`")
+
+    st.stop()
 
 
 # ============================================================
@@ -82,12 +106,6 @@ ROC_IMAGE = "images/rf_roc_curves.png"
 # ============================================================
 
 def get_file_hash(path):
-
-    if not os.path.exists(path):
-
-        raise FileNotFoundError(
-            f"File not found: {path}"
-        )
 
     with open(path, "rb") as f:
 
@@ -97,11 +115,9 @@ def get_file_hash(path):
 
 
 # ============================================================
-# LOAD MODEL
+# LOAD MODEL AND DATA
 #
-# NO @st.cache_resource
-#
-# This is intentional.
+# NO STREAMLIT CACHE
 # ============================================================
 
 def load_model():
@@ -140,10 +156,6 @@ def load_model():
     )
 
 
-# ============================================================
-# LOAD EVERYTHING FRESH
-# ============================================================
-
 (
     model,
     model_features,
@@ -179,34 +191,43 @@ if not hasattr(
     st.stop()
 
 
-if model.n_features_in_ != 23:
+# ------------------------------------------------------------
+# Check number of features
+# ------------------------------------------------------------
+
+if model.n_features_in_ != len(model_features):
 
     st.error(
-        f"Random Forest expects "
-        f"{model.n_features_in_} features, "
-        f"not 23."
+        f"""
+        Model-feature mismatch.
+
+        Random Forest expects:
+        {model.n_features_in_} features
+
+        model_features.pkl contains:
+        {len(model_features)} features
+        """
     )
 
     st.stop()
 
 
-if len(model_features) != 23:
+# ------------------------------------------------------------
+# Check test dataset features
+# ------------------------------------------------------------
+
+if X_test.shape[1] != model.n_features_in_:
 
     st.error(
-        f"model_features.pkl contains "
-        f"{len(model_features)} features."
-    )
+        f"""
+        X_test feature mismatch.
 
-    st.stop()
+        Model expects:
+        {model.n_features_in_}
 
-
-if len(model_features) != len(
-    model.feature_importances_
-):
-
-    st.error(
-        "Feature count mismatch between "
-        "model and model_features.pkl."
+        X_test contains:
+        {X_test.shape[1]}
+        """
     )
 
     st.stop()
@@ -246,26 +267,35 @@ gender = st.sidebar.selectbox(
 
 age = st.sidebar.number_input(
     "Age (years)",
-    min_value=1,
+    min_value=18,
     max_value=100,
-    value=25
+    value=25,
+    step=1
 )
 
 
+# IMPORTANT:
+# Dataset training range is approximately:
+# Height: 1.45–1.98 m
+
 height = st.sidebar.number_input(
     "Height (m)",
-    min_value=1.0,
-    max_value=2.5,
+    min_value=1.45,
+    max_value=1.98,
     value=1.60,
     step=0.01
 )
 
 
+# IMPORTANT:
+# Dataset training range is approximately:
+# Weight: 39–173 kg
+
 weight = st.sidebar.number_input(
     "Weight (kg)",
-    min_value=20.0,
-    max_value=250.0,
-    value=200.0,
+    min_value=39.0,
+    max_value=173.0,
+    value=60.0,
     step=0.5
 )
 
@@ -275,7 +305,8 @@ family_history = st.sidebar.selectbox(
     [
         "yes",
         "no"
-    ]
+    ],
+    index=1
 )
 
 
@@ -310,7 +341,8 @@ favc = st.sidebar.selectbox(
     [
         "yes",
         "no"
-    ]
+    ],
+    index=0
 )
 
 
@@ -340,7 +372,7 @@ caec = st.sidebar.selectbox(
         "Frequently",
         "Always"
     ],
-    index=0
+    index=1
 )
 
 
@@ -358,7 +390,8 @@ scc = st.sidebar.selectbox(
     [
         "no",
         "yes"
-    ]
+    ],
+    index=0
 )
 
 
@@ -388,7 +421,8 @@ smoke = st.sidebar.selectbox(
     [
         "no",
         "yes"
-    ]
+    ],
+    index=0
 )
 
 
@@ -424,7 +458,7 @@ mtrans = st.sidebar.selectbox(
 
 
 # ============================================================
-# BUILD EXACT 23 FEATURES
+# BUILD INPUT DATA
 # ============================================================
 
 input_data = {
@@ -516,7 +550,7 @@ input_df = input_df.reindex(
 
 
 # ============================================================
-# FORCE FLOAT
+# FORCE NUMERIC DATA TYPE
 # ============================================================
 
 input_df = input_df.astype(
@@ -528,9 +562,7 @@ input_df = input_df.astype(
 # VERIFY FEATURE NAMES
 # ============================================================
 
-if list(input_df.columns) != list(
-    model_features
-):
+if list(input_df.columns) != list(model_features):
 
     st.error(
         "Feature order does not match model_features.pkl."
@@ -554,9 +586,7 @@ prediction_proba = model.predict_proba(
 
 
 prediction_probability = float(
-    np.max(
-        prediction_proba
-    )
+    np.max(prediction_proba)
 )
 
 
@@ -696,8 +726,38 @@ with p1:
     )
 
     st.metric(
-        "Prediction Probability",
+        "Model Confidence",
         f"{prediction_probability:.2%}"
+    )
+
+    # --------------------------------------------------------
+    # Confidence explanation
+    # --------------------------------------------------------
+
+    if prediction_probability >= 0.80:
+
+        st.success(
+            "High model confidence"
+        )
+
+    elif prediction_probability >= 0.60:
+
+        st.info(
+            "Moderate model confidence"
+        )
+
+    else:
+
+        st.warning(
+            "Lower model confidence — "
+            "the model finds the input less clearly "
+            "associated with one obesity category."
+        )
+
+    st.caption(
+        "Model confidence is the Random Forest's highest "
+        "predicted class probability. It is not a guarantee "
+        "that the prediction is correct."
     )
 
 
@@ -723,6 +783,10 @@ with p2:
     ax.set_xlim(
         0,
         1
+    )
+
+    ax.set_title(
+        "Random Forest Class Probabilities"
     )
 
     plt.tight_layout()
@@ -800,6 +864,7 @@ with c3:
         "Technology Usage",
         f"{tue:.1f}"
     )
+
 
 # ============================================================
 # MODEL COMPARISON
@@ -893,10 +958,18 @@ if section == "Confusion Matrix":
         "Confusion Matrix"
     )
 
-    st.image(
-        CONFUSION_IMAGE,
-        width="stretch"
-    )
+    if os.path.exists(CONFUSION_IMAGE):
+
+        st.image(
+            CONFUSION_IMAGE,
+            width="stretch"
+        )
+
+    else:
+
+        st.warning(
+            "Confusion matrix image not found."
+        )
 
 
 # ============================================================
@@ -937,10 +1010,19 @@ elif section == "Feature Importance":
         "Feature Importance"
     )
 
-    st.image(
-        FEATURE_IMPORTANCE_IMAGE,
-        width="stretch"
-    )
+    if os.path.exists(FEATURE_IMPORTANCE_IMAGE):
+
+        st.image(
+            FEATURE_IMPORTANCE_IMAGE,
+            width="stretch"
+        )
+
+    else:
+
+        st.warning(
+            "Feature importance image not found."
+        )
+
 
     importances = pd.Series(
         model.feature_importances_,
@@ -949,16 +1031,19 @@ elif section == "Feature Importance":
         ascending=False
     )
 
+
     feature_df = (
         importances
         .head(15)
         .reset_index()
     )
 
+
     feature_df.columns = [
         "Feature",
         "Importance"
     ]
+
 
     st.dataframe(
         feature_df,
@@ -977,9 +1062,51 @@ elif section == "ROC Curves":
         "ROC Curves"
     )
 
-    st.image(
-        ROC_IMAGE,
-        width="stretch"
+    if os.path.exists(ROC_IMAGE):
+
+        st.image(
+            ROC_IMAGE,
+            width="stretch"
+        )
+
+    else:
+
+        st.warning(
+            "ROC curve image not found."
+        )
+
+
+# ============================================================
+# MODEL INFORMATION
+# ============================================================
+
+st.markdown("---")
+
+with st.expander("Model Information"):
+
+    st.write(
+        "Model type:",
+        type(model).__name__
+    )
+
+    st.write(
+        "Number of features:",
+        model.n_features_in_
+    )
+
+    st.write(
+        "Number of trees:",
+        model.n_estimators
+    )
+
+    st.write(
+        "Classes:",
+        list(model.classes_)
+    )
+
+    st.write(
+        "Model MD5:",
+        model_hash
     )
 
 
