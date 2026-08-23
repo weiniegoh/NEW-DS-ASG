@@ -91,7 +91,7 @@ MODEL_REGISTRY = {
         "available": False,
     },
 
-    "Gradient Boosting": {
+    "XGBoost": {
         "available": True,
         "model_path": "models/xgboost_model.pkl",
         "X_test_path": "data/X_test_encoded.pkl",
