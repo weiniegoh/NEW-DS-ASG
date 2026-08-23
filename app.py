@@ -938,7 +938,7 @@ elif section == "ROC Curves":
         width="stretch"
     )
 
-
+st.write("Weight sent to model:", input_aligned["Weight"].iloc[0])
 # ============================================================
 # FOOTER
 # ============================================================
