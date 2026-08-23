@@ -83,6 +83,7 @@ MODEL_REGISTRY = {
     "confusion_matrix_image": "images/knn_confusion_matrix.png",
     "feature_importance_image": "images/knn_feature_importance.png",
     "roc_curve_image": "images/knn_roc_curves.png",
+     "feature_importance_data": "data/knn_feature_importance.csv",
 },
 
     "Logistic Regression": {
@@ -884,51 +885,22 @@ elif section == "Classification Report":
 elif section == "Feature Importance":
 
     st.subheader("Feature Importance")
+    st.caption(f"Feature importance generated for the {selected_model_name} model.")
 
-    st.caption(
-        f"Feature importance generated for the "
-        f"{selected_model_name} model."
-    )
-
-    st.image(
-        selected_config["feature_importance_image"],
-        width="stretch"
-    )
+    st.image(selected_config["feature_importance_image"], width="stretch")
 
     if hasattr(model, "feature_importances_"):
-
-        importances = pd.Series(
-            model.feature_importances_,
-            index=X_test.columns
-        ).sort_values(
-            ascending=False
-        )
-
+        importances = pd.Series(model.feature_importances_, index=X_test.columns).sort_values(ascending=False)
         top15 = importances.head(15)
+        feature_df = top15.reset_index().rename(columns={"index": "Feature", 0: "Importance"})
+        st.dataframe(feature_df, width="stretch", hide_index=True)
 
-        feature_df = (
-            top15
-            .reset_index()
-            .rename(
-                columns={
-                    "index": "Feature",
-                    0: "Importance"
-                }
-            )
-        )
-
-        st.dataframe(
-            feature_df,
-            width="stretch",
-            hide_index=True
-        )
+    elif "feature_importance_data" in selected_config:
+        feature_df = pd.read_csv(selected_config["feature_importance_data"])
+        st.dataframe(feature_df, width="stretch", hide_index=True)
 
     else:
-
-        st.info(
-            "Feature importance is not available for this model."
-        )
-
+        st.info("Feature importance is not available for this model.")
 
 # ============================================================
 # ROC CURVES
