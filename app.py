@@ -31,21 +31,6 @@ st.title("Obesity Level Classification — Model Comparison")
 st.caption("CRISP-DM Project | Estimation of Obesity Levels Based on Eating Habits and Physical Condition")
 
 # ============================================================
-# DIAGNOSTIC — TEMPORARY, remove once file paths are confirmed working
-# ============================================================
-with st.expander("🔍 Diagnostic: Files visible to this app (click to expand)", expanded=True):
-    st.write("**Current working directory:**", os.getcwd())
-    st.write("**Contents of current directory:**")
-    st.code("\n".join(sorted(os.listdir("."))))
-
-    for folder in ["models", "data"]:
-        st.write(f"**Contents of `{folder}/`:**")
-        if os.path.isdir(folder):
-            st.code("\n".join(sorted(os.listdir(folder))))
-        else:
-            st.error(f"Folder '{folder}' does not exist in the working directory!")
-
-# ============================================================
 # MODEL REGISTRY
 # ------------------------------------------------------------
 # Add each new model here once it's trained & saved.
@@ -125,14 +110,19 @@ col5.metric("ROC-AUC (Macro)", f"{roc_auc_macro:.4f}")
 st.markdown("---")
 
 # ============================================================
-# TABS FOR DETAILED SECTIONS
+# SECTION SELECTOR (radio instead of tabs — only the selected
+# section's code executes, which keeps memory usage low)
 # ============================================================
-tab0, tab1, tab2, tab3, tab4 = st.tabs([
-    "Predict", "Confusion Matrix", "Classification Report", "Feature Importance", "ROC Curves"
-])
+section = st.radio(
+    "View:",
+    ["Predict", "Confusion Matrix", "Classification Report", "Feature Importance", "ROC Curves"],
+    horizontal=True,
+    label_visibility="collapsed"
+)
+st.markdown("")
 
-# ---- TAB 0: Live Prediction ----
-with tab0:
+# ---- SECTION: Live Prediction ----
+if section == "Predict":
     st.subheader("Predict Obesity Level")
     st.caption("Enter an individual's information below to get a predicted obesity category.")
 
@@ -214,8 +204,8 @@ with tab0:
         st.pyplot(fig)
         plt.close(fig)
 
-# ---- TAB 1: Confusion Matrix ----
-with tab1:
+# ---- SECTION: Confusion Matrix ----
+elif section == "Confusion Matrix":
     cm = confusion_matrix(y_test, y_pred)
     cm_pct = cm.astype("float") / cm.sum(axis=1)[:, np.newaxis] * 100
 
@@ -241,14 +231,14 @@ with tab1:
         st.pyplot(fig)
         plt.close(fig)
 
-# ---- TAB 2: Classification Report ----
-with tab2:
+# ---- SECTION: Classification Report ----
+elif section == "Classification Report":
     report_dict = classification_report(y_test, y_pred, output_dict=True)
     report_df = pd.DataFrame(report_dict).transpose().round(4)
     st.dataframe(report_df, width="stretch")
 
-# ---- TAB 3: Feature Importance ----
-with tab3:
+# ---- SECTION: Feature Importance ----
+elif section == "Feature Importance":
     if hasattr(model, "feature_importances_"):
         importances = pd.Series(
             model.feature_importances_, index=X_test.columns
@@ -268,8 +258,8 @@ with tab3:
     else:
         st.info(f"{selected_model_name} does not expose feature_importances_.")
 
-# ---- TAB 4: ROC Curves ----
-with tab4:
+# ---- SECTION: ROC Curves ----
+elif section == "ROC Curves":
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
     colors = cycle(["#e6194B", "#3cb44b", "#4363d8", "#f58231",
                      "#911eb4", "#42d4f4", "#bfef45"])
