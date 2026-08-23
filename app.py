@@ -1,8 +1,8 @@
 """
-Obesity Level Classification — Model Comparison Dashboard
-============================================================
-Run with:
+Obesity Level Classification — Random Forest Streamlit Dashboard
+================================================================
 
+Run:
     streamlit run app.py
 """
 
@@ -15,7 +15,7 @@ matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
 import joblib
-import gc
+import hashlib
 
 from sklearn.metrics import (
     accuracy_score,
@@ -49,86 +49,64 @@ st.caption(
 
 
 # ============================================================
-# MODEL REGISTRY
+# MODEL CONFIGURATION
 # ============================================================
 
-MODEL_REGISTRY = {
+MODEL_PATH = "models/random_forest_model.pkl"
 
-    "Random Forest": {
+FEATURE_PATH = "data/model_features.pkl"
 
-        "available": True,
+X_TEST_PATH = "data/X_test_encoded.pkl"
 
-        "model_path":
-            "models/random_forest_model.pkl",
+Y_TEST_PATH = "data/y_test_flat.pkl"
 
-        "model_features_path":
-            "data/model_features.pkl",
+Y_PRED_PATH = "data/rf_y_pred.pkl"
 
-        "X_test_path":
-            "data/X_test_encoded.pkl",
+Y_PROBA_PATH = "data/rf_y_pred_proba.pkl"
 
-        "y_test_path":
-            "data/y_test_flat.pkl",
 
-        "y_pred_path":
-            "data/rf_y_pred.pkl",
+CONFUSION_IMAGE = (
+    "images/rf_confusion_matrix.png"
+)
 
-        "y_proba_path":
-            "data/rf_y_pred_proba.pkl",
+FEATURE_IMPORTANCE_IMAGE = (
+    "images/rf_feature_importance.png"
+)
 
-        "confusion_matrix_image":
-            "images/rf_confusion_matrix.png",
-
-        "feature_importance_image":
-            "images/rf_feature_importance.png",
-
-        "roc_curve_image":
-            "images/rf_roc_curves.png",
-    },
-
-    "K-Nearest Neighbours (KNN)": {
-        "available": False,
-    },
-
-    "Logistic Regression": {
-        "available": False,
-    },
-
-    "Gradient Boosting": {
-        "available": False,
-    },
-}
+ROC_IMAGE = (
+    "images/rf_roc_curves.png"
+)
 
 
 # ============================================================
-# LOAD ARTIFACTS
+# LOAD MODEL
 # ============================================================
 
 @st.cache_resource
-def load_artifacts(config):
+def load_model():
 
     model = joblib.load(
-        config["model_path"]
+        MODEL_PATH
     )
 
     model_features = joblib.load(
-        config["model_features_path"]
+        FEATURE_PATH
     )
 
     X_test = joblib.load(
-        config["X_test_path"]
+        X_TEST_PATH
     )
 
     y_test = joblib.load(
-        config["y_test_path"]
+        Y_TEST_PATH
     )
 
     y_pred = joblib.load(
-        config["y_pred_path"]
+        Y_PRED_PATH
     )
 
     y_proba = joblib.load(
-        config["y_proba_path"]
+        Y_PROBA_PATH
     )
 
     return (
@@ -141,6 +119,68 @@ def load_artifacts(config):
     )
 
 
+(
+    model,
+    model_features,
+    X_test,
+    y_test,
+    y_pred,
+    y_proba
+) = load_model()
+
+
+# ============================================================
+# MODEL VALIDATION
+# ============================================================
+
+if not hasattr(
+    model,
+    "feature_importances_"
+):
+
+    st.error(
+        "The loaded model is not a Random Forest "
+        "model with feature_importances_."
+    )
+
+    st.stop()
+
+
+if len(model_features) != 23:
+
+    st.error(
+        f"Expected 23 model features, but found "
+        f"{len(model_features)}."
+    )
+
+    st.stop()
+
+
+if len(model_features) != len(
+    model.feature_importances_
+):
+
+    st.error(
+        "Feature count does not match the Random Forest."
+    )
+
+    st.stop()
+
+
+# ============================================================
+# MODEL HASH
+# ============================================================
+
+with open(
+    MODEL_PATH,
+    "rb"
+) as f:
+
+    model_hash = hashlib.md5(
+        f.read()
+    ).hexdigest()
+
+
 # ============================================================
 # SIDEBAR
 # ============================================================
@@ -149,38 +189,18 @@ st.sidebar.header(
     "Dashboard Controls"
 )
 
-st.sidebar.subheader(
-    "Model Selection"
-)
-
-selected_model_name = st.sidebar.selectbox(
-    "Select Model",
-    list(MODEL_REGISTRY.keys()),
-    key="selected_model"
-)
-
-selected_config = MODEL_REGISTRY[
-    selected_model_name
-]
-
 
 # ============================================================
 # PREDICTION INPUTS
 # ============================================================
 
-st.sidebar.markdown("---")
-
 st.sidebar.subheader(
     "Prediction Inputs"
 )
 
-st.sidebar.caption(
-    "Enter an individual's information."
-)
-
 
 # ============================================================
-# DEMOGRAPHIC & PHYSICAL INFORMATION
+# DEMOGRAPHIC / PHYSICAL
 # ============================================================
 
 st.sidebar.markdown(
@@ -190,11 +210,8 @@ st.sidebar.markdown(
 
 gender = st.sidebar.selectbox(
     "Gender",
-    [
-        "Female",
-        "Male"
-    ],
-    key="input_gender"
+    ["Female", "Male"],
+    key="gender"
 )
 
 
@@ -203,8 +220,7 @@ age = st.sidebar.number_input(
     min_value=1,
     max_value=100,
     value=25,
-    step=1,
-    key="input_age"
+    key="age"
 )
 
 
@@ -212,9 +228,9 @@ height = st.sidebar.number_input(
     "Height (m)",
     min_value=1.0,
     max_value=2.5,
-    value=1.70,
+    value=1.60,
     step=0.01,
-    key="input_height"
+    key="height"
 )
 
 
@@ -222,19 +238,16 @@ weight = st.sidebar.number_input(
     "Weight (kg)",
     min_value=20.0,
     max_value=250.0,
-    value=70.0,
+    value=200.0,
     step=0.5,
-    key="input_weight"
+    key="weight"
 )
 
 
 family_history = st.sidebar.selectbox(
-    "Family history of overweight?",
-    [
-        "yes",
-        "no"
-    ],
-    key="input_family_history"
+    "Family history with overweight?",
+    ["yes", "no"],
+    key="family_history"
 )
 
 
@@ -242,9 +255,8 @@ family_history = st.sidebar.selectbox(
 # BMI
 # ============================================================
 
-bmi = float(
-    weight / (height ** 2)
-)
+bmi = weight / (height ** 2)
+
 
 st.sidebar.metric(
     "Calculated BMI",
@@ -263,11 +275,8 @@ st.sidebar.markdown(
 
 favc = st.sidebar.selectbox(
     "Frequent high-calorie food (FAVC)?",
-    [
-        "yes",
-        "no"
-    ],
-    key="input_favc"
+    ["yes", "no"],
+    key="favc"
 )
 
 
@@ -276,8 +285,8 @@ fcvc = st.sidebar.slider(
     1.0,
     3.0,
     2.0,
-    step=0.1,
-    key="input_fcvc"
+    0.1,
+    key="fcvc"
 )
 
 
@@ -286,8 +295,8 @@ ncp = st.sidebar.slider(
     1.0,
     4.0,
     3.0,
-    step=0.1,
-    key="input_ncp"
+    0.1,
+    key="ncp"
 )
 
 
@@ -299,7 +308,7 @@ caec = st.sidebar.selectbox(
         "Frequently",
         "Always"
     ],
-    key="input_caec"
+    key="caec"
 )
 
 
@@ -308,18 +317,15 @@ ch2o = st.sidebar.slider(
     1.0,
     3.0,
     2.0,
-    step=0.1,
-    key="input_ch2o"
+    0.1,
+    key="ch2o"
 )
 
 
 scc = st.sidebar.selectbox(
     "Monitors calorie consumption (SCC)?",
-    [
-        "no",
-        "yes"
-    ],
-    key="input_scc"
+    ["no", "yes"],
+    key="scc"
 )
 
 
@@ -331,7 +337,7 @@ calc = st.sidebar.selectbox(
         "Frequently",
         "Always"
     ],
-    key="input_calc"
+    key="calc"
 )
 
 
@@ -346,11 +352,8 @@ st.sidebar.markdown(
 
 smoke = st.sidebar.selectbox(
     "Smoker?",
-    [
-        "no",
-        "yes"
-    ],
-    key="input_smoke"
+    ["no", "yes"],
+    key="smoke"
 )
 
 
@@ -359,8 +362,8 @@ faf = st.sidebar.slider(
     0.0,
     3.0,
     1.0,
-    step=0.1,
-    key="input_faf"
+    0.1,
+    key="faf"
 )
 
 
@@ -369,8 +372,8 @@ tue = st.sidebar.slider(
     0.0,
     2.0,
     1.0,
-    step=0.1,
-    key="input_tue"
+    0.1,
+    key="tue"
 )
 
 
@@ -383,100 +386,12 @@ mtrans = st.sidebar.selectbox(
         "Public_Transportation",
         "Walking"
     ],
-    key="input_mtrans"
+    key="mtrans"
 )
 
 
 # ============================================================
-# CHECK MODEL
-# ============================================================
-
-if not selected_config.get(
-    "available",
-    False
-):
-
-    st.info(
-        f"**{selected_model_name}** has not been imported yet."
-    )
-
-    st.stop()
-
-
-# ============================================================
-# LOAD MODEL
-# ============================================================
-
-(
-    model,
-    model_features,
-    X_test,
-    y_test,
-    y_pred,
-    y_proba
-) = load_artifacts(
-    selected_config
-)
-
-
-# ============================================================
-# VERIFY FEATURES
-# ============================================================
-
-if len(model_features) != len(
-    model.feature_importances_
-):
-
-    st.error(
-        "Model feature count does not match "
-        "model_features.pkl."
-    )
-
-    st.stop()
-
-
-# ============================================================
-# IMPORTANT:
-# VERIFY EXACT FEATURE ORDER
-# ============================================================
-
-expected_features = [
-    'Age',
-    'Height',
-    'Weight',
-    'FCVC',
-    'NCP',
-    'CH2O',
-    'FAF',
-    'TUE',
-    'Gender_Male',
-    'family_history_with_overweight_yes',
-    'FAVC_yes',
-    'CAEC_Frequently',
-    'CAEC_Sometimes',
-    'CAEC_no',
-    'SMOKE_yes',
-    'SCC_yes',
-    'CALC_Frequently',
-    'CALC_Sometimes',
-    'CALC_no',
-    'MTRANS_Bike',
-    'MTRANS_Motorbike',
-    'MTRANS_Public_Transportation',
-    'MTRANS_Walking'
-]
-
-
-if model_features != expected_features:
-
-    st.warning(
-        "The loaded model_features.pkl does not exactly "
-        "match the expected 23-feature order."
-    )
-
-
-# ============================================================
-# CREATE EXACT 23-FEATURE INPUT
+# BUILD EXACT 23 FEATURES
 # ============================================================
 
 input_data = {
@@ -549,7 +464,7 @@ input_data = {
         1 if mtrans == "Public_Transportation" else 0,
 
     "MTRANS_Walking":
-        1 if mtrans == "Walking" else 0,
+        1 if mtrans == "Walking" else 0
 }
 
 
@@ -559,56 +474,22 @@ input_df = pd.DataFrame(
 
 
 # ============================================================
-# FORCE EXACT TRAINING ORDER
+# FORCE EXACT TRAINING FEATURE ORDER
 # ============================================================
 
-input_aligned = input_df[
-    model_features
-].copy()
-
-
-# ============================================================
-# NUMERIC TYPE ENFORCEMENT
-# ============================================================
-
-for col in model_features:
-
-    input_aligned[col] = pd.to_numeric(
-        input_aligned[col],
-        errors="coerce"
-    )
+input_df = input_df.reindex(
+    columns=model_features,
+    fill_value=0
+)
 
 
 # ============================================================
-# CHECK FOR NaN
+# FORCE NUMERIC TYPE
 # ============================================================
 
-if input_aligned.isna().any().any():
-
-    st.error(
-        "Input contains NaN values."
-    )
-
-    st.dataframe(
-        input_aligned
-    )
-
-    st.stop()
-
-
-# ============================================================
-# FINAL INPUT CHECK
-# ============================================================
-
-if input_aligned.shape != (1, 23):
-
-    st.error(
-        f"Incorrect input shape: "
-        f"{input_aligned.shape}. "
-        f"Expected (1, 23)."
-    )
-
-    st.stop()
+input_df = input_df.astype(
+    np.float64
+)
 
 
 # ============================================================
@@ -616,17 +497,17 @@ if input_aligned.shape != (1, 23):
 # ============================================================
 
 prediction = model.predict(
-    input_aligned
+    input_df
 )[0]
 
 
 prediction_proba = model.predict_proba(
-    input_aligned
+    input_df
 )[0]
 
 
-prediction_probability = float(
-    np.max(prediction_proba)
+prediction_probability = (
+    float(np.max(prediction_proba))
 )
 
 
@@ -651,15 +532,6 @@ proba_df = pd.DataFrame({
 # ============================================================
 # PERFORMANCE METRICS
 # ============================================================
-
-class_names = model.classes_
-
-
-y_test_binarized = label_binarize(
-    y_test,
-    classes=class_names
-)
-
 
 accuracy = accuracy_score(
     y_test,
@@ -688,6 +560,12 @@ recall_w = recall_score(
 )
 
 
+y_test_binarized = label_binarize(
+    y_test,
+    classes=model.classes_
+)
+
+
 roc_auc_macro = roc_auc_score(
     y_test_binarized,
     y_proba,
@@ -697,43 +575,47 @@ roc_auc_macro = roc_auc_score(
 
 
 # ============================================================
-# MAIN PAGE
+# MAIN HEADER
 # ============================================================
 
 st.header(
-    f"{selected_model_name} — Performance Overview"
+    "Random Forest — Performance Overview"
 )
 
 
 # ============================================================
-# METRICS
+# PERFORMANCE CARDS
 # ============================================================
 
-col1, col2, col3, col4, col5 = st.columns(5)
+c1, c2, c3, c4, c5 = st.columns(5)
 
 
-col1.metric(
+c1.metric(
     "Accuracy",
     f"{accuracy:.2%}"
 )
 
-col2.metric(
+
+c2.metric(
     "F1 (Weighted)",
     f"{f1_weighted:.4f}"
 )
 
-col3.metric(
-    "Precision (Weighted)",
+
+c3.metric(
+    "Precision",
     f"{precision_w:.4f}"
 )
 
-col4.metric(
-    "Recall (Weighted)",
+
+c4.metric(
+    "Recall",
     f"{recall_w:.4f}"
 )
 
-col5.metric(
-    "ROC-AUC (Macro)",
+
+c5.metric(
+    "ROC-AUC",
     f"{roc_auc_macro:.4f}"
 )
 
@@ -749,12 +631,12 @@ st.subheader(
 )
 
 
-prediction_col1, prediction_col2 = st.columns(
+p1, p2 = st.columns(
     [1, 2]
 )
 
 
-with prediction_col1:
+with p1:
 
     st.markdown(
         "### Predicted Obesity Level"
@@ -770,7 +652,7 @@ with prediction_col1:
     )
 
 
-with prediction_col2:
+with p2:
 
     st.markdown(
         "### Class Probabilities"
@@ -786,7 +668,7 @@ with prediction_col2:
     )
 
     ax.set_xlabel(
-        "Predicted Probability"
+        "Probability"
     )
 
     ax.set_xlim(
@@ -801,8 +683,6 @@ with prediction_col2:
     )
 
     plt.close(fig)
-
-    gc.collect()
 
 
 # ============================================================
@@ -874,82 +754,49 @@ with c3:
 
 
 # ============================================================
-# DEBUG / INPUT VERIFICATION
+# DEBUG / VERIFICATION
 # ============================================================
 
 st.markdown("---")
 
 with st.expander(
-    "🔍 View Exact Input Sent to Random Forest"
+    "🔍 Verify Model Input"
 ):
 
     st.write(
-        "The following 23 features are sent directly "
-        "to the trained Random Forest:"
-    )
-
-    st.dataframe(
-        input_aligned,
-        hide_index=True,
-        width="stretch"
+        "**Model file:**",
+        MODEL_PATH
     )
 
     st.write(
-        "Input shape:",
-        input_aligned.shape
+        "**Model MD5:**",
+        model_hash
     )
 
     st.write(
-        "Model feature count:",
+        "**Number of features:**",
         len(model_features)
     )
 
     st.write(
-        "Model classes:",
+        "**Model classes:**",
         list(model.classes_)
     )
 
-
-# ============================================================
-# DIRECT PREDICTION VERIFICATION
-# ============================================================
-
-with st.expander(
-    "🧪 Direct Prediction Verification"
-):
-
     st.write(
-        "Height:",
-        height
-    )
-
-    st.write(
-        "Weight:",
-        weight
-    )
-
-    st.write(
-        "BMI:",
+        "**BMI:**",
         bmi
     )
 
     st.write(
-        "Prediction:",
-        prediction
+        "**Exact input sent to Random Forest:**"
     )
 
-    st.write(
-        "Probabilities:"
+    st.dataframe(
+        input_df,
+        hide_index=True,
+        width="stretch"
     )
-
-    for cls, prob in zip(
-        model.classes_,
-        prediction_proba
-    ):
-
-        st.write(
-            f"{cls}: {prob:.4%}"
-        )
 
 
 # ============================================================
@@ -963,161 +810,64 @@ st.header(
 )
 
 
-def calculate_model_metrics(
-    model_name
-):
+comparison_df = pd.DataFrame({
 
-    config = MODEL_REGISTRY[
-        model_name
+    "Model": [
+        "Random Forest",
+        "K-Nearest Neighbours (KNN)",
+        "Logistic Regression",
+        "Gradient Boosting"
+    ],
+
+    "Accuracy": [
+        f"{accuracy:.2%}",
+        "Not Available",
+        "Not Available",
+        "Not Available"
+    ],
+
+    "F1 (Weighted)": [
+        f"{f1_weighted:.4f}",
+        "Not Available",
+        "Not Available",
+        "Not Available"
+    ],
+
+    "Precision (Weighted)": [
+        f"{precision_w:.4f}",
+        "Not Available",
+        "Not Available",
+        "Not Available"
+    ],
+
+    "Recall (Weighted)": [
+        f"{recall_w:.4f}",
+        "Not Available",
+        "Not Available",
+        "Not Available"
+    ],
+
+    "ROC-AUC (Macro)": [
+        f"{roc_auc_macro:.4f}",
+        "Not Available",
+        "Not Available",
+        "Not Available"
     ]
-
-    if not config.get(
-        "available",
-        False
-    ):
-
-        return {
-
-            "Model":
-                model_name,
-
-            "Accuracy":
-                "Not Available",
-
-            "F1 (Weighted)":
-                "Not Available",
-
-            "Precision (Weighted)":
-                "Not Available",
-
-            "Recall (Weighted)":
-                "Not Available",
-
-            "ROC-AUC (Macro)":
-                "Not Available"
-        }
-
-
-    try:
-
-        (
-            loaded_model,
-            loaded_features,
-            loaded_X_test,
-            loaded_y_test,
-            loaded_y_pred,
-            loaded_y_proba
-        ) = load_artifacts(
-            config
-        )
-
-        loaded_classes = (
-            loaded_model.classes_
-        )
-
-        loaded_y_test_bin = (
-            label_binarize(
-                loaded_y_test,
-                classes=loaded_classes
-            )
-        )
-
-        return {
-
-            "Model":
-                model_name,
-
-            "Accuracy":
-                f"{accuracy_score(
-                    loaded_y_test,
-                    loaded_y_pred
-                ):.2%}",
-
-            "F1 (Weighted)":
-                f"{f1_score(
-                    loaded_y_test,
-                    loaded_y_pred,
-                    average='weighted'
-                ):.4f}",
-
-            "Precision (Weighted)":
-                f"{precision_score(
-                    loaded_y_test,
-                    loaded_y_pred,
-                    average='weighted'
-                ):.4f}",
-
-            "Recall (Weighted)":
-                f"{recall_score(
-                    loaded_y_test,
-                    loaded_y_pred,
-                    average='weighted'
-                ):.4f}",
-
-            "ROC-AUC (Macro)":
-                f"{roc_auc_score(
-                    loaded_y_test_bin,
-                    loaded_y_proba,
-                    average='macro',
-                    multi_class='ovr'
-                ):.4f}"
-        }
-
-
-    except Exception as e:
-
-        return {
-
-            "Model":
-                model_name,
-
-            "Accuracy":
-                "Error",
-
-            "F1 (Weighted)":
-                "Error",
-
-            "Precision (Weighted)":
-                "Error",
-
-            "Recall (Weighted)":
-                "Error",
-
-            "ROC-AUC (Macro)":
-                "Error"
-        }
-
-
-comparison_rows = []
-
-
-for model_name in MODEL_REGISTRY:
-
-    comparison_rows.append(
-        calculate_model_metrics(
-            model_name
-        )
-    )
-
-
-comparison_df = pd.DataFrame(
-    comparison_rows
-)
+})
 
 
 st.dataframe(
     comparison_df,
-    width="stretch",
-    hide_index=True
+    hide_index=True,
+    width="stretch"
 )
 
 
 # ============================================================
-# RESULTS NAVIGATION
+# RESULTS
 # ============================================================
 
 st.markdown("---")
-
 
 section = st.radio(
     "View Results",
@@ -1127,8 +877,7 @@ section = st.radio(
         "Feature Importance",
         "ROC Curves"
     ],
-    horizontal=True,
-    label_visibility="collapsed"
+    horizontal=True
 )
 
 
@@ -1143,9 +892,7 @@ if section == "Confusion Matrix":
     )
 
     st.image(
-        selected_config[
-            "confusion_matrix_image"
-        ],
+        CONFUSION_IMAGE,
         width="stretch"
     )
 
@@ -1160,16 +907,14 @@ elif section == "Classification Report":
         "Classification Report"
     )
 
-    report_dict = classification_report(
+    report = classification_report(
         y_test,
         y_pred,
         output_dict=True
     )
 
     report_df = (
-        pd.DataFrame(
-            report_dict
-        )
+        pd.DataFrame(report)
         .transpose()
         .round(4)
     )
@@ -1191,40 +936,33 @@ elif section == "Feature Importance":
     )
 
     st.image(
-        selected_config[
-            "feature_importance_image"
-        ],
+        FEATURE_IMPORTANCE_IMAGE,
         width="stretch"
     )
 
-    if hasattr(
-        model,
-        "feature_importances_"
-    ):
+    importances = pd.Series(
+        model.feature_importances_,
+        index=model_features
+    ).sort_values(
+        ascending=False
+    )
 
-        importances = pd.Series(
-            model.feature_importances_,
-            index=model_features
-        ).sort_values(
-            ascending=False
-        )
+    feature_df = (
+        importances
+        .head(15)
+        .reset_index()
+    )
 
-        feature_df = (
-            importances
-            .head(15)
-            .reset_index()
-        )
+    feature_df.columns = [
+        "Feature",
+        "Importance"
+    ]
 
-        feature_df.columns = [
-            "Feature",
-            "Importance"
-        ]
-
-        st.dataframe(
-            feature_df,
-            width="stretch",
-            hide_index=True
-        )
+    st.dataframe(
+        feature_df,
+        hide_index=True,
+        width="stretch"
+    )
 
 
 # ============================================================
@@ -1238,9 +976,7 @@ elif section == "ROC Curves":
     )
 
     st.image(
-        selected_config[
-            "roc_curve_image"
-        ],
+        ROC_IMAGE,
         width="stretch"
     )
 
