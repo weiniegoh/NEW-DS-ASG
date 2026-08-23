@@ -210,32 +210,7 @@ if section == "Predict":
 
 # ---- SECTION: Confusion Matrix ----
 elif section == "Confusion Matrix":
-    cm = confusion_matrix(y_test, y_pred)
-    cm_pct = cm.astype("float") / cm.sum(axis=1)[:, np.newaxis] * 100
-
-    c1, c2 = st.columns(2)
-    with c1:
-        fig, ax = plt.subplots(figsize=(6, 5))
-        sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
-                    xticklabels=class_names, yticklabels=class_names, ax=ax)
-        ax.set_title("Counts")
-        ax.set_xlabel("Predicted")
-        ax.set_ylabel("Actual")
-        plt.xticks(rotation=45, ha="right")
-        st.pyplot(fig)
-        plt.close(fig)
-        gc.collect()
-    with c2:
-        fig, ax = plt.subplots(figsize=(6, 5))
-        sns.heatmap(cm_pct, annot=True, fmt=".1f", cmap="Blues",
-                    xticklabels=class_names, yticklabels=class_names, ax=ax)
-        ax.set_title("Row-wise Percentages")
-        ax.set_xlabel("Predicted")
-        ax.set_ylabel("Actual")
-        plt.xticks(rotation=45, ha="right")
-        st.pyplot(fig)
-        plt.close(fig)
-        gc.collect()
+    st.image("images/rf_confusion_matrix.png", width="stretch")
 
 # ---- SECTION: Classification Report ----
 elif section == "Classification Report":
@@ -245,55 +220,20 @@ elif section == "Classification Report":
 
 # ---- SECTION: Feature Importance ----
 elif section == "Feature Importance":
+    st.image("images/rf_feature_importance.png", width="stretch")
+
     if hasattr(model, "feature_importances_"):
         importances = pd.Series(
             model.feature_importances_, index=X_test.columns
         ).sort_values(ascending=False)
-
-        fig, ax = plt.subplots(figsize=(8, 6))
         top15 = importances.head(15)
-        ax.barh(top15.index[::-1], top15.values[::-1], color="steelblue")
-        ax.set_xlabel("Importance")
-        ax.set_title("Top 15 Feature Importances")
-        st.pyplot(fig)
-        plt.close(fig)
-        gc.collect()
-
         st.dataframe(top15.reset_index().rename(
             columns={"index": "Feature", 0: "Importance"}
         ))
-    else:
-        st.info(f"{selected_model_name} does not expose feature_importances_.")
 
 # ---- SECTION: ROC Curves ----
 elif section == "ROC Curves":
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
-    colors = cycle(["#e6194B", "#3cb44b", "#4363d8", "#f58231",
-                     "#911eb4", "#42d4f4", "#bfef45"])
-    color_list = list(colors)[:n_classes]
-
-    for i, color in zip(range(n_classes), color_list):
-        fpr, tpr, _ = roc_curve(y_test_binarized[:, i], y_proba[:, i])
-        roc_auc_i = auc(fpr, tpr)
-        axes[0].plot(fpr, tpr, color=color, lw=2,
-                      label=f"{class_names[i]} (AUC={roc_auc_i:.3f})")
-    axes[0].plot([0, 1], [0, 1], "k--", lw=1.5, label="Random")
-    axes[0].set_xlabel("False Positive Rate")
-    axes[0].set_ylabel("True Positive Rate")
-    axes[0].set_title("Full View")
-    axes[0].legend(loc="lower right", fontsize=8)
-
-    for i, color in zip(range(n_classes), color_list):
-        fpr, tpr, _ = roc_curve(y_test_binarized[:, i], y_proba[:, i])
-        axes[1].plot(fpr, tpr, color=color, lw=2)
-    axes[1].plot([0, 0.3], [0, 0.3], "k--", lw=1)
-    axes[1].set_xlim([0, 0.3])
-    axes[1].set_ylim([0.7, 1.02])
-    axes[1].set_title("Zoomed View (Low FPR)")
-
-    st.pyplot(fig)
-    plt.close(fig)
-    gc.collect()
+    st.image("images/rf_roc_curves.png", width="stretch")
 
 st.markdown("---")
 st.caption("Obesity Levels dataset — UCI Machine Learning Repository")
