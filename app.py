@@ -73,7 +73,7 @@ MODEL_REGISTRY = {
             "images/rf_roc_curves.png",
     },
 
-    "Decision Tree": {
+    "K-Nearest Neighbours (KNN)": {
         "available": False,
     },
 
@@ -317,7 +317,7 @@ if not selected_config.get("available", False):
     comparison_data = {
         "Model": [
             "Random Forest",
-            "Decision Tree",
+            "K-Nearest Neighbours (KNN)",
             "Logistic Regression",
             "Gradient Boosting"
         ],
