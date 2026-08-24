@@ -407,6 +407,10 @@ y_test_binarized = label_binarize(
 # MODEL PERFORMANCE METRICS
 # ============================================================
 
+# change
+y_test = np.asarray(y_test).astype(str)
+y_pred = np.asarray(y_pred).astype(str)
+
 accuracy = accuracy_score(
     y_test,
     y_pred
