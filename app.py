@@ -67,6 +67,8 @@ MODEL_REGISTRY = {
         "confusion_matrix_image": "images/lr_confusion_matrix.png",
         "feature_importance_image": "images/lr_feature_importance.png",
         "roc_curve_image": "images/lr_roc_curves.png",
+        "feature_importance_data":
+        "data/lr_feature_importance.csv",
         
     },
     
