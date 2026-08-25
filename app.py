@@ -348,7 +348,7 @@ if not selected_config.get("available", False):
             "Random Forest",
             "K-Nearest Neighbours (KNN)",
             "Logistic Regression",
-            "Gradient Boosting"
+            "XGBoost"
         ],
         "Accuracy": [
             "87.24%" if MODEL_REGISTRY["Random Forest"]["available"]
