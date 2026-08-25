@@ -480,12 +480,44 @@ input_dict = {
     "MTRANS": mtrans,
 }
 
-# Convert the raw input dictionary directly into a DataFrame
-input_df = pd.DataFrame([input_dict])
 
-# Pass the raw DataFrame to the Pipeline, which handles encoding automatically
-prediction = model.predict(input_df)[0]
-prediction_proba = model.predict_proba(input_df)[0]
+# Build the encoded row manually — pd.get_dummies is unreliable on a
+# single row because drop_first drops whatever category is present,
+# regardless of which category it actually is.
+input_aligned = pd.DataFrame(0.0, index=[0], columns=X_test.columns)
+
+# Numeric columns — copy directly
+numeric_cols = ["Age", "Height", "Weight", "FCVC", "NCP", "CH2O", "FAF", "TUE"]
+for col in numeric_cols:
+    if col in input_aligned.columns:
+        input_aligned.at[0, col] = input_dict[col]
+
+# Categorical columns — set the matching dummy column to 1.
+# If the dummy column doesn't exist in X_test.columns, that means this
+# value IS the training data's reference category, so leaving it at 0 is correct.
+categorical_map = {
+    "Gender": gender,
+    "family_history_with_overweight": family_history,
+    "FAVC": favc,
+    "CAEC": caec,
+    "SMOKE": smoke,
+    "SCC": scc,
+    "CALC": calc,
+    "MTRANS": mtrans,
+}
+
+for col, value in categorical_map.items():
+    dummy_col_name = f"{col}_{value}"
+    if dummy_col_name in input_aligned.columns:
+        input_aligned.at[0, dummy_col_name] = 1.0
+
+prediction = model.predict(
+    input_aligned
+)[0]
+
+prediction_proba = model.predict_proba(
+    input_aligned
+)[0]
 
 prediction_probability = prediction_proba.max()
 
