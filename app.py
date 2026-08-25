@@ -55,6 +55,10 @@ st.caption(
 
 MODEL_REGISTRY = {
 
+    "Logistic Regression": {
+        "available": False,
+    },
+    
     "Random Forest": {
         "available": True,
 
@@ -86,10 +90,6 @@ MODEL_REGISTRY = {
     "roc_curve_image": "images/knn_roc_curves.png",
      "feature_importance_data": "data/knn_feature_importance.csv",
 },
-
-    "Logistic Regression": {
-        "available": False,
-    },
 
     "XGBoost": {
         "available": True,
