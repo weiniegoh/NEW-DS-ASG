@@ -24,6 +24,23 @@ from sklearn.preprocessing import label_binarize
 
 
 # ============================================================
+# XGBOOST CLASS ORDER
+# ============================================================
+# XGBClassifier is trained with integer target IDs (0..6).
+# The exported xgb_y_pred.pkl uses the original string labels.
+# Keep this order identical to LabelEncoder.classes_ in XGBoost.ipynb.
+XGB_CLASS_NAMES = np.array([
+    "Insufficient_Weight",
+    "Normal_Weight",
+    "Obesity_Type_I",
+    "Obesity_Type_II",
+    "Obesity_Type_III",
+    "Overweight_Level_I",
+    "Overweight_Level_II"
+], dtype=str)
+
+
+# ============================================================
 # PAGE CONFIG
 # ============================================================
 
@@ -408,7 +425,17 @@ model, X_test, y_test, y_pred, y_proba = load_artifacts(
     selected_config
 )
 
-class_names = model.classes_
+# Keep evaluation labels consistent across every model.
+y_test = np.asarray(y_test).ravel().astype(str)
+y_pred = np.asarray(y_pred).ravel().astype(str)
+
+# A plain XGBClassifier stores integer classes (0..6), while the shared
+# y_test and exported XGBoost predictions are obesity-level strings.
+# Use the fixed LabelEncoder class order only for XGBoost.
+if selected_model_name == "XGBoost":
+    class_names = XGB_CLASS_NAMES
+else:
+    class_names = np.asarray(model.classes_).astype(str)
 
 y_test_binarized = label_binarize(
     y_test,
@@ -419,10 +446,6 @@ y_test_binarized = label_binarize(
 # ============================================================
 # MODEL PERFORMANCE METRICS
 # ============================================================
-
-# change
-y_test = np.asarray(y_test).astype(str)
-y_pred = np.asarray(y_pred).astype(str)
 
 accuracy = accuracy_score(
     y_test,
@@ -486,7 +509,25 @@ input_dict = {
 # Build the encoded row manually — pd.get_dummies is unreliable on a
 # single row because drop_first drops whatever category is present,
 # regardless of which category it actually is.
-input_aligned = pd.DataFrame(0.0, index=[0], columns=X_test.columns)
+#
+# IMPORTANT FOR XGBOOST:
+# XGBoost validates feature NAMES as well as the number/order of features.
+# Therefore, when XGBoost is selected, build the input row from the exact
+# feature names stored inside the fitted booster instead of blindly using
+# the shared X_test columns.
+if selected_model_name == "XGBoost":
+    prediction_columns = model.get_booster().feature_names
+
+    if not prediction_columns:
+        prediction_columns = X_test.columns.tolist()
+else:
+    prediction_columns = X_test.columns.tolist()
+
+input_aligned = pd.DataFrame(
+    0.0,
+    index=[0],
+    columns=prediction_columns
+)
 
 # Numeric columns — copy directly
 numeric_cols = ["Age", "Height", "Weight", "FCVC", "NCP", "CH2O", "FAF", "TUE"]
@@ -513,7 +554,7 @@ for col, value in categorical_map.items():
     if dummy_col_name in input_aligned.columns:
         input_aligned.at[0, dummy_col_name] = 1.0
 
-prediction = model.predict(
+raw_prediction = model.predict(
     input_aligned
 )[0]
 
@@ -521,11 +562,19 @@ prediction_proba = model.predict_proba(
     input_aligned
 )[0]
 
+# Convert XGBoost's integer class ID back to the original obesity label.
+if selected_model_name == "XGBoost":
+    prediction = XGB_CLASS_NAMES[int(raw_prediction)]
+    probability_class_names = XGB_CLASS_NAMES
+else:
+    prediction = str(raw_prediction)
+    probability_class_names = np.asarray(model.classes_).astype(str)
+
 prediction_probability = prediction_proba.max()
 
 
 proba_df = pd.DataFrame({
-    "Class": model.classes_,
+    "Class": probability_class_names,
     "Probability": prediction_proba
 }).sort_values(
     "Probability",
@@ -756,7 +805,13 @@ def calculate_model_metrics(model_name):
             load_artifacts(config)
         )
 
-        loaded_classes = loaded_model.classes_
+        loaded_y_test = np.asarray(loaded_y_test).ravel().astype(str)
+        loaded_y_pred = np.asarray(loaded_y_pred).ravel().astype(str)
+
+        if model_name == "XGBoost":
+            loaded_classes = XGB_CLASS_NAMES
+        else:
+            loaded_classes = np.asarray(loaded_model.classes_).astype(str)
 
         loaded_y_test_bin = label_binarize(
             loaded_y_test,
@@ -916,9 +971,22 @@ elif section == "Feature Importance":
     st.image(selected_config["feature_importance_image"], width="stretch")
 
     if hasattr(model, "feature_importances_"):
-        importances = pd.Series(model.feature_importances_, index=X_test.columns).sort_values(ascending=False)
+        if selected_model_name == "XGBoost":
+            feature_names = model.get_booster().feature_names
+            if not feature_names:
+                feature_names = X_test.columns.tolist()
+        else:
+            feature_names = X_test.columns.tolist()
+
+        importances = pd.Series(
+            model.feature_importances_,
+            index=feature_names
+        ).sort_values(ascending=False)
+
         top15 = importances.head(15)
-        feature_df = top15.reset_index().rename(columns={"index": "Feature", 0: "Importance"})
+        feature_df = top15.reset_index().rename(
+            columns={"index": "Feature", 0: "Importance"}
+        )
         st.dataframe(feature_df, width="stretch", hide_index=True)
 
     elif "feature_importance_data" in selected_config:
