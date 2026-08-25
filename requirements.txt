@@ -4,5 +4,5 @@ numpy
 matplotlib
 seaborn
 scikit-learn==1.6.1
-joblib=1.5.3
+joblib==1.5.3
 xgboost
