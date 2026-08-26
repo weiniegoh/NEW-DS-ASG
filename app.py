@@ -718,6 +718,131 @@ st.markdown("---")
 
 
 # ============================================================
+# RESULTS NAVIGATION
+# ============================================================
+
+st.markdown("---")
+
+section = st.radio(
+    "View Results",
+    [
+        "Confusion Matrix",
+        "Classification Report",
+        "Feature Importance",
+        "ROC Curves"
+    ],
+    horizontal=True,
+    label_visibility="collapsed"
+)
+
+st.markdown("")
+
+
+# ============================================================
+# CONFUSION MATRIX
+# ============================================================
+
+if section == "Confusion Matrix":
+
+    st.subheader("Confusion Matrix")
+
+    st.caption(
+        f"Confusion matrix for the {selected_model_name} model."
+    )
+
+    st.image(
+        selected_config["confusion_matrix_image"],
+        width="stretch"
+    )
+
+
+# ============================================================
+# CLASSIFICATION REPORT
+# ============================================================
+
+elif section == "Classification Report":
+
+    st.subheader("Classification Report")
+
+    st.caption(
+        "Detailed precision, recall, F1-score and support "
+        "for each obesity category."
+    )
+
+    report_dict = classification_report(
+        y_test,
+        y_pred,
+        output_dict=True
+    )
+
+    report_df = (
+        pd.DataFrame(report_dict)
+        .transpose()
+        .round(4)
+    )
+
+    st.dataframe(
+        report_df,
+        width="stretch"
+    )
+
+
+# ============================================================
+# FEATURE IMPORTANCE
+# ============================================================
+
+elif section == "Feature Importance":
+
+    st.subheader("Feature Importance")
+    st.caption(f"Feature importance generated for the {selected_model_name} model.")
+
+    st.image(selected_config["feature_importance_image"], width="stretch")
+
+    if hasattr(model, "feature_importances_"):
+        if selected_model_name == "XGBoost":
+            feature_names = model.get_booster().feature_names
+            if not feature_names:
+                feature_names = X_test.columns.tolist()
+        else:
+            feature_names = X_test.columns.tolist()
+
+        importances = pd.Series(
+            model.feature_importances_,
+            index=feature_names
+        ).sort_values(ascending=False)
+
+        top15 = importances.head(15)
+        feature_df = top15.reset_index().rename(
+            columns={"index": "Feature", 0: "Importance"}
+        )
+        st.dataframe(feature_df, width="stretch", hide_index=True)
+
+    elif "feature_importance_data" in selected_config:
+        feature_df = pd.read_csv(selected_config["feature_importance_data"])
+        st.dataframe(feature_df, width="stretch", hide_index=True)
+
+    else:
+        st.info("Feature importance is not available for this model.")
+
+# ============================================================
+# ROC CURVES
+# ============================================================
+
+elif section == "ROC Curves":
+
+    st.subheader("ROC Curves")
+
+    st.caption(
+        f"One-vs-Rest ROC curves for the "
+        f"{selected_model_name} model."
+    )
+
+    st.image(
+        selected_config["roc_curve_image"],
+        width="stretch"
+    )
+
+# ============================================================
 # MODEL COMPARISON
 # ============================================================
 
@@ -925,131 +1050,6 @@ if numeric_rows:
     st.pyplot(fig2)
     plt.close(fig2)
     gc.collect()
-
-# ============================================================
-# RESULTS NAVIGATION
-# ============================================================
-
-st.markdown("---")
-
-section = st.radio(
-    "View Results",
-    [
-        "Confusion Matrix",
-        "Classification Report",
-        "Feature Importance",
-        "ROC Curves"
-    ],
-    horizontal=True,
-    label_visibility="collapsed"
-)
-
-st.markdown("")
-
-
-# ============================================================
-# CONFUSION MATRIX
-# ============================================================
-
-if section == "Confusion Matrix":
-
-    st.subheader("Confusion Matrix")
-
-    st.caption(
-        f"Confusion matrix for the {selected_model_name} model."
-    )
-
-    st.image(
-        selected_config["confusion_matrix_image"],
-        width="stretch"
-    )
-
-
-# ============================================================
-# CLASSIFICATION REPORT
-# ============================================================
-
-elif section == "Classification Report":
-
-    st.subheader("Classification Report")
-
-    st.caption(
-        "Detailed precision, recall, F1-score and support "
-        "for each obesity category."
-    )
-
-    report_dict = classification_report(
-        y_test,
-        y_pred,
-        output_dict=True
-    )
-
-    report_df = (
-        pd.DataFrame(report_dict)
-        .transpose()
-        .round(4)
-    )
-
-    st.dataframe(
-        report_df,
-        width="stretch"
-    )
-
-
-# ============================================================
-# FEATURE IMPORTANCE
-# ============================================================
-
-elif section == "Feature Importance":
-
-    st.subheader("Feature Importance")
-    st.caption(f"Feature importance generated for the {selected_model_name} model.")
-
-    st.image(selected_config["feature_importance_image"], width="stretch")
-
-    if hasattr(model, "feature_importances_"):
-        if selected_model_name == "XGBoost":
-            feature_names = model.get_booster().feature_names
-            if not feature_names:
-                feature_names = X_test.columns.tolist()
-        else:
-            feature_names = X_test.columns.tolist()
-
-        importances = pd.Series(
-            model.feature_importances_,
-            index=feature_names
-        ).sort_values(ascending=False)
-
-        top15 = importances.head(15)
-        feature_df = top15.reset_index().rename(
-            columns={"index": "Feature", 0: "Importance"}
-        )
-        st.dataframe(feature_df, width="stretch", hide_index=True)
-
-    elif "feature_importance_data" in selected_config:
-        feature_df = pd.read_csv(selected_config["feature_importance_data"])
-        st.dataframe(feature_df, width="stretch", hide_index=True)
-
-    else:
-        st.info("Feature importance is not available for this model.")
-
-# ============================================================
-# ROC CURVES
-# ============================================================
-
-elif section == "ROC Curves":
-
-    st.subheader("ROC Curves")
-
-    st.caption(
-        f"One-vs-Rest ROC curves for the "
-        f"{selected_model_name} model."
-    )
-
-    st.image(
-        selected_config["roc_curve_image"],
-        width="stretch"
-    )
 
 
 # ============================================================
