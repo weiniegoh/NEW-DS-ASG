@@ -362,59 +362,7 @@ if not selected_config.get("available", False):
 
     st.header("Model Comparison")
 
-    comparison_data = {
-        "Model": [
-            "Random Forest",
-            "K-Nearest Neighbours (KNN)",
-            "Logistic Regression",
-            "XGBoost"
-        ],
-        "Accuracy": [
-            "87.24%" if MODEL_REGISTRY["Random Forest"]["available"]
-            else "Not Available",
-            "Not Available",
-            "Not Available",
-            "Not Available"
-        ],
-        "F1 (Weighted)": [
-            "0.8732" if MODEL_REGISTRY["Random Forest"]["available"]
-            else "Not Available",
-            "Not Available",
-            "Not Available",
-            "Not Available"
-        ],
-        "Precision (Weighted)": [
-            "Available" if MODEL_REGISTRY["Random Forest"]["available"]
-            else "Not Available",
-            "Not Available",
-            "Not Available",
-            "Not Available"
-        ],
-        "Recall (Weighted)": [
-            "Available" if MODEL_REGISTRY["Random Forest"]["available"]
-            else "Not Available",
-            "Not Available",
-            "Not Available",
-            "Not Available"
-        ],
-        "ROC-AUC (Macro)": [
-            "Available" if MODEL_REGISTRY["Random Forest"]["available"]
-            else "Not Available",
-            "Not Available",
-            "Not Available",
-            "Not Available"
-        ]
-    }
 
-    comparison_df = pd.DataFrame(comparison_data)
-
-    st.dataframe(
-        comparison_df,
-        width="stretch",
-        hide_index=True
-    )
-
-    st.stop()
 
 
 # ============================================================
