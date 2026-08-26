@@ -841,288 +841,912 @@ elif section == "ROC Curves":
         width="stretch"
     )
 
+
 # ============================================================
-# MODEL COMPARISON — DASHBOARD
+# MODEL COMPARISON — HIGH-MARK ANALYTICS DASHBOARD
 # ============================================================
 
 st.markdown("---")
 st.header("Model Comparison")
 st.caption(
-    "Compare all four trained models using the same held-out test set. "
-    "The dashboard highlights the strongest overall model and shows where the models differ."
+    "Analytical comparison of Logistic Regression, KNN, Random Forest and "
+    "XGBoost using the same 627-sample held-out test set."
 )
 
+
 # ------------------------------------------------------------
-# Build one numeric comparison dataset
+# Notebook cross-validation results
+# ------------------------------------------------------------
+# These values come directly from the project's notebook.
+# Test-set metrics and misclassifications are still calculated
+# dynamically from the saved prediction artifacts.
+CV_RESULTS = {
+    "Logistic Regression": {
+        "CV Accuracy": 0.8568,
+        "CV Accuracy Std": 0.0214,
+        "CV F1": 0.8542,
+        "CV F1 Std": 0.0227,
+    },
+    "Random Forest": {
+        "CV Accuracy": 0.9253,
+        "CV Accuracy Std": 0.0416 / 2,
+        "CV F1": 0.9264,
+        "CV F1 Std": 0.0421 / 2,
+    },
+    "K-Nearest Neighbours (KNN)": {
+        "CV Accuracy": 0.8822,
+        "CV Accuracy Std": 0.0148,
+        "CV F1": 0.8779,
+        "CV F1 Std": 0.0165,
+    },
+    "XGBoost": {
+        "CV Accuracy": 0.9651,
+        "CV Accuracy Std": 0.0105,
+        "CV F1": 0.9649,
+        "CV F1 Std": 0.0105,
+    },
+}
+
+
+# ------------------------------------------------------------
+# Load all model artifacts once
 # ------------------------------------------------------------
 
 @st.cache_data(show_spinner=False)
-def build_comparison_data():
+def build_model_comparison():
     rows = []
+    artifacts = {}
 
     for model_name, config in MODEL_REGISTRY.items():
         if not config.get("available", False):
             continue
 
         try:
-            loaded_model, _, loaded_y_test, loaded_y_pred, loaded_y_proba = load_artifacts(config)
+            loaded_model, loaded_X_test, loaded_y_test, loaded_y_pred, loaded_y_proba = (
+                load_artifacts(config)
+            )
 
-            loaded_y_test = np.asarray(loaded_y_test).ravel().astype(str)
-            loaded_y_pred = np.asarray(loaded_y_pred).ravel().astype(str)
+            y_true = np.asarray(loaded_y_test).ravel().astype(str)
+            y_pred = np.asarray(loaded_y_pred).ravel().astype(str)
+
+            # Ensure probability output is numeric and 2-D.
+            y_proba = np.asarray(loaded_y_proba)
 
             if model_name == "XGBoost":
-                loaded_classes = XGB_CLASS_NAMES
+                classes = XGB_CLASS_NAMES
             else:
-                loaded_classes = np.asarray(loaded_model.classes_).astype(str)
+                classes = np.asarray(loaded_model.classes_).astype(str)
 
-            loaded_y_test_bin = label_binarize(
-                loaded_y_test,
-                classes=loaded_classes
+            y_true_bin = label_binarize(y_true, classes=classes)
+
+            # Some artifacts can contain one extra dimension.
+            if y_proba.ndim > 2:
+                y_proba = np.squeeze(y_proba)
+
+            accuracy = accuracy_score(y_true, y_pred)
+            precision = precision_score(
+                y_true, y_pred, average="weighted", zero_division=0
             )
+            recall = recall_score(
+                y_true, y_pred, average="weighted", zero_division=0
+            )
+            weighted_f1 = f1_score(
+                y_true, y_pred, average="weighted", zero_division=0
+            )
+            macro_f1 = f1_score(
+                y_true, y_pred, average="macro", zero_division=0
+            )
+
+            try:
+                roc_auc = roc_auc_score(
+                    y_true_bin,
+                    y_proba,
+                    average="weighted",
+                    multi_class="ovr",
+                )
+            except ValueError:
+                roc_auc = np.nan
+
+            errors = int(np.sum(y_true != y_pred))
+            error_rate = errors / len(y_true)
+
+            cv = CV_RESULTS.get(model_name, {})
 
             rows.append({
                 "Model": model_name,
-                "Accuracy": accuracy_score(loaded_y_test, loaded_y_pred),
-                "F1 Score": f1_score(loaded_y_test, loaded_y_pred, average="weighted"),
-                "Precision": precision_score(loaded_y_test, loaded_y_pred, average="weighted"),
-                "Recall": recall_score(loaded_y_test, loaded_y_pred, average="weighted"),
-                "ROC-AUC": roc_auc_score(
-                    loaded_y_test_bin,
-                    loaded_y_proba,
-                    average="macro",
-                    multi_class="ovr"
-                ),
-                "Misclassification": (loaded_y_test != loaded_y_pred).mean(),
-                "Correct": int((loaded_y_test == loaded_y_pred).sum()),
-                "Errors": int((loaded_y_test != loaded_y_pred).sum()),
-                "Test Size": len(loaded_y_test),
+                "Accuracy": accuracy,
+                "Precision": precision,
+                "Recall": recall,
+                "F1 Score": weighted_f1,
+                "Macro F1": macro_f1,
+                "ROC-AUC": roc_auc,
+                "Errors": errors,
+                "Error Rate": error_rate,
+                "Test Size": len(y_true),
+                "CV Accuracy": cv.get("CV Accuracy", np.nan),
+                "CV Accuracy Std": cv.get("CV Accuracy Std", np.nan),
+                "CV F1": cv.get("CV F1", np.nan),
+                "CV F1 Std": cv.get("CV F1 Std", np.nan),
             })
+
+            artifacts[model_name] = {
+                "model": loaded_model,
+                "y_true": y_true,
+                "y_pred": y_pred,
+                "y_proba": y_proba,
+                "classes": classes,
+            }
+
         except Exception as exc:
-            st.warning(f"Could not calculate comparison metrics for {model_name}: {exc}")
+            st.warning(
+                f"Could not load comparison results for {model_name}: {exc}"
+            )
 
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows), artifacts
 
 
-comparison_numeric = build_comparison_data()
+comparison_df, comparison_artifacts = build_model_comparison()
 
-if not comparison_numeric.empty:
-
-    # --------------------------------------------------------
-    # Overall score / ranking
-    # --------------------------------------------------------
-    score_metrics = ["Accuracy", "F1 Score", "Precision", "Recall", "ROC-AUC"]
-    comparison_numeric["Overall Score"] = comparison_numeric[score_metrics].mean(axis=1)
-    comparison_numeric = comparison_numeric.sort_values("Overall Score", ascending=False).reset_index(drop=True)
-    comparison_numeric["Rank"] = np.arange(1, len(comparison_numeric) + 1)
-
-    winner = comparison_numeric.iloc[0]
-    runner_up = comparison_numeric.iloc[1] if len(comparison_numeric) > 1 else None
+if comparison_df.empty:
+    st.error("No model evaluation artifacts are available.")
+else:
 
     # --------------------------------------------------------
-    # Polished CSS cards
+    # Overall score
     # --------------------------------------------------------
-    st.markdown("""
-    <style>
-    .winner-card {
-        padding: 22px 26px;
-        border-radius: 16px;
-        background: linear-gradient(135deg, rgba(255,193,7,.16), rgba(255,255,255,.04));
-        border: 1px solid rgba(255,193,7,.45);
-        margin: 8px 0 20px 0;
-    }
-    .winner-title { font-size: 14px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; opacity: .75; }
-    .winner-model { font-size: 30px; font-weight: 800; margin: 2px 0 4px 0; }
-    .winner-text { font-size: 15px; opacity: .82; }
-    .model-card {
-        padding: 18px 18px 14px 18px;
-        border-radius: 14px;
-        border: 1px solid rgba(128,128,128,.25);
-        background: rgba(128,128,128,.045);
-        min-height: 150px;
-    }
-    .model-card-best {
-        border: 2px solid rgba(255,193,7,.65);
-        background: linear-gradient(135deg, rgba(255,193,7,.12), rgba(128,128,128,.035));
-    }
-    .model-name { font-weight: 750; font-size: 16px; margin-bottom: 8px; }
-    .model-rank { float: right; opacity: .65; font-size: 13px; }
-    .metric-big { font-size: 28px; font-weight: 800; line-height: 1.1; }
-    .metric-label { font-size: 12px; opacity: .68; }
-    </style>
-    """, unsafe_allow_html=True)
+    score_metrics = [
+        "Accuracy",
+        "Precision",
+        "Recall",
+        "F1 Score",
+        "ROC-AUC",
+    ]
+
+    comparison_df["Overall Score"] = comparison_df[score_metrics].mean(
+        axis=1, skipna=True
+    )
+
+    comparison_df = (
+        comparison_df
+        .sort_values("Overall Score", ascending=False)
+        .reset_index(drop=True)
+    )
+
+    comparison_df["Rank"] = np.arange(1, len(comparison_df) + 1)
+
+    winner = comparison_df.iloc[0]
 
     # --------------------------------------------------------
-    # Winner banner
+    # CSS
     # --------------------------------------------------------
-    gap_text = ""
-    if runner_up is not None:
-        gap_text = (
-            f" It leads the second-ranked {runner_up['Model']} by "
-            f"{(winner['Overall Score'] - runner_up['Overall Score']):.3f} "
-            "on the average of the five performance metrics."
-        )
+    st.markdown(
+        """
+        <style>
+        .comparison-winner {
+            padding: 24px;
+            border-radius: 16px;
+            border: 1px solid rgba(46, 125, 50, .35);
+            background: rgba(46, 125, 50, .08);
+            margin-bottom: 18px;
+        }
 
+        .comparison-winner h2 {
+            margin: 0 0 6px 0;
+        }
+
+        .comparison-card {
+            padding: 18px;
+            border-radius: 14px;
+            border: 1px solid rgba(128,128,128,.25);
+            min-height: 180px;
+        }
+
+        .comparison-card-best {
+            border: 2px solid rgba(46,125,50,.65);
+            background: rgba(46,125,50,.07);
+        }
+
+        .small-label {
+            font-size: 12px;
+            opacity: .70;
+        }
+
+        .large-number {
+            font-size: 28px;
+            font-weight: 800;
+        }
+
+        .analysis-box {
+            padding: 18px;
+            border-radius: 12px;
+            background: rgba(128,128,128,.06);
+            border: 1px solid rgba(128,128,128,.20);
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # --------------------------------------------------------
+    # 1. WINNER / MODEL SELECTION
+    # --------------------------------------------------------
     st.markdown(
         f"""
-        <div class="winner-card">
-            <div class="winner-title">🏆 Best Overall Model</div>
-            <div class="winner-model">{winner['Model']}</div>
-            <div class="winner-text">
-                Strongest combined performance across Accuracy, F1, Precision, Recall and ROC-AUC.{gap_text}
+        <div class="comparison-winner">
+            <h2>🏆 Recommended Final Model: {winner["Model"]}</h2>
+            <div>
+                The model has the strongest overall test performance across
+                Accuracy, Precision, Recall, weighted F1-score and ROC-AUC.
             </div>
         </div>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
+
+    winner_cols = st.columns(5)
+
+    winner_metrics = [
+        ("Accuracy", winner["Accuracy"], "{:.2%}"),
+        ("Weighted F1", winner["F1 Score"], "{:.4f}"),
+        ("Precision", winner["Precision"], "{:.4f}"),
+        ("Recall", winner["Recall"], "{:.4f}"),
+        ("ROC-AUC", winner["ROC-AUC"], "{:.4f}"),
+    ]
+
+    for col, (label, value, fmt) in zip(winner_cols, winner_metrics):
+        with col:
+            st.metric(label, fmt.format(value))
 
     # --------------------------------------------------------
     # Four model cards
     # --------------------------------------------------------
-    card_cols = st.columns(len(comparison_numeric))
+    st.markdown("### Model Scorecards")
 
-    for col, (_, row) in zip(card_cols, comparison_numeric.iterrows()):
-        best_class = "model-card-best" if row["Model"] == winner["Model"] else ""
-        badge = "🏆 Best" if row["Model"] == winner["Model"] else f"#{int(row['Rank'])}"
+    card_cols = st.columns(len(comparison_df))
+
+    for col, (_, row) in zip(card_cols, comparison_df.iterrows()):
+        best_class = (
+            "comparison-card-best"
+            if row["Model"] == winner["Model"]
+            else ""
+        )
+
         with col:
             st.markdown(
                 f"""
-                <div class="model-card {best_class}">
-                    <div class="model-name">{row['Model']} <span class="model-rank">{badge}</span></div>
-                    <div class="metric-big">{row['Accuracy']:.2%}</div>
-                    <div class="metric-label">Accuracy</div>
-                    <div style="margin-top:10px;">
-                        <b>F1</b> {row['F1 Score']:.3f}
-                        &nbsp;&nbsp; <b>AUC</b> {row['ROC-AUC']:.3f}
+                <div class="comparison-card {best_class}">
+                    <div>
+                        <b>#{int(row["Rank"])} {row["Model"]}</b>
+                    </div>
+                    <br>
+                    <div class="small-label">Accuracy</div>
+                    <div class="large-number">{row["Accuracy"]:.2%}</div>
+                    <br>
+                    <div>
+                        <b>F1:</b> {row["F1 Score"]:.4f}<br>
+                        <b>ROC-AUC:</b> {row["ROC-AUC"]:.4f}<br>
+                        <b>Errors:</b> {int(row["Errors"])} / {int(row["Test Size"])}
                     </div>
                 </div>
                 """,
-                unsafe_allow_html=True
+                unsafe_allow_html=True,
             )
 
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("")
 
     # --------------------------------------------------------
-    # Interactive metric selector
+    # 2. INTERACTIVE METRIC COMPARISON
     # --------------------------------------------------------
-    left, right = st.columns([1, 2])
-    with left:
-        comparison_metric = st.selectbox(
-            "Compare by",
-            ["Accuracy", "F1 Score", "Precision", "Recall", "ROC-AUC", "Misclassification"],
-            key="comparison_metric"
-        )
+    st.markdown("### 1. Performance Comparison")
 
-    chart_df = comparison_numeric.copy()
-    chart_df = chart_df.sort_values(comparison_metric, ascending=(comparison_metric == "Misclassification"))
+    metric = st.selectbox(
+        "Select a metric to compare",
+        [
+            "Accuracy",
+            "Precision",
+            "Recall",
+            "F1 Score",
+            "ROC-AUC",
+            "Error Rate",
+        ],
+        key="comparison_metric_high_mark",
+    )
 
-    # --------------------------------------------------------
-    # Main comparison chart
-    # --------------------------------------------------------
-    fig, ax = plt.subplots(figsize=(10, 4.8))
-    values = chart_df[comparison_metric].to_numpy()
-    labels = chart_df["Model"].to_numpy()
-    bars = ax.barh(labels, values)
+    chart_df = comparison_df[["Model", metric]].copy()
 
-    for bar, value in zip(bars, values):
-        label = f"{value:.2%}" if comparison_metric != "Misclassification" else f"{value:.2%}"
+    # For error rate, lower is better.
+    ascending = metric == "Error Rate"
+    chart_df = chart_df.sort_values(metric, ascending=ascending)
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+
+    bars = ax.barh(
+        chart_df["Model"],
+        chart_df[metric],
+    )
+
+    max_value = float(chart_df[metric].max())
+
+    for bar, value in zip(bars, chart_df[metric]):
         ax.text(
-            bar.get_width() + max(values) * 0.012,
+            bar.get_width() + max(max_value * 0.015, 0.001),
             bar.get_y() + bar.get_height() / 2,
-            label,
+            f"{value:.2%}",
             va="center",
-            fontsize=10,
-            fontweight="bold"
+            fontweight="bold",
         )
 
-    if comparison_metric == "Misclassification":
-        ax.set_xlim(0, max(values) * 1.22 if max(values) else 1)
-        ax.set_xlabel("Error Rate")
-    else:
-        ax.set_xlim(0, min(1.0, max(values) * 1.12))
-        ax.set_xlabel("Score")
-
-    ax.set_title(f"{comparison_metric} by Model", fontsize=14, fontweight="bold", pad=12)
-    ax.grid(axis="x", alpha=0.22)
+    ax.set_xlabel(
+        "Error Rate" if metric == "Error Rate" else "Score"
+    )
+    ax.set_title(
+        f"{metric} Comparison Across Models",
+        fontweight="bold",
+    )
+    ax.grid(axis="x", alpha=0.20)
     ax.spines[["top", "right", "left"]].set_visible(False)
+
+    upper = max_value * 1.18 if max_value > 0 else 1
+    ax.set_xlim(0, upper)
+
     plt.tight_layout()
     st.pyplot(fig, width="stretch")
     plt.close(fig)
 
     # --------------------------------------------------------
-    # Full comparison table
+    # Performance summary table
     # --------------------------------------------------------
-    st.subheader("Performance Summary")
-    st.caption("Higher is better for Accuracy, F1, Precision, Recall and ROC-AUC. Lower is better for Misclassification.")
+    st.markdown("#### Complete Performance Summary")
 
-    display_df = comparison_numeric[[
-        "Rank", "Model", "Accuracy", "F1 Score", "Precision", "Recall", "ROC-AUC", "Misclassification", "Errors"
-    ]].copy()
+    summary_display = comparison_df[
+        [
+            "Rank",
+            "Model",
+            "Accuracy",
+            "Precision",
+            "Recall",
+            "F1 Score",
+            "ROC-AUC",
+            "Errors",
+            "Error Rate",
+        ]
+    ].copy()
 
-    display_df.columns = [
-        "Rank", "Model", "Accuracy", "F1 Score", "Precision", "Recall", "ROC-AUC", "Error Rate", "Errors"
+    summary_display.columns = [
+        "Rank",
+        "Model",
+        "Accuracy",
+        "Precision",
+        "Recall",
+        "Weighted F1",
+        "ROC-AUC",
+        "Errors",
+        "Error Rate",
     ]
 
     st.dataframe(
-        display_df.style.format({
+        summary_display.style.format({
             "Accuracy": "{:.2%}",
-            "F1 Score": "{:.4f}",
             "Precision": "{:.4f}",
             "Recall": "{:.4f}",
+            "Weighted F1": "{:.4f}",
             "ROC-AUC": "{:.4f}",
             "Error Rate": "{:.2%}",
-        }).background_gradient(
-            subset=["Accuracy", "F1 Score", "Precision", "Recall", "ROC-AUC"],
-            cmap="Blues"
-        ).background_gradient(
-            subset=["Error Rate"],
-            cmap="Reds"
-        ),
-        width="stretch",
-        hide_index=True
+        }),
+        use_container_width=True,
+        hide_index=True,
     )
 
     # --------------------------------------------------------
-    # Error comparison + interpretation
+    # 3. CROSS-VALIDATION STABILITY
     # --------------------------------------------------------
-    st.subheader("Classification Errors")
+    st.markdown("### 2. Cross-Validation Stability")
 
-    error_cols = st.columns(len(comparison_numeric))
-    for col, (_, row) in zip(error_cols, comparison_numeric.iterrows()):
-        with col:
-            st.metric(
-                row["Model"],
-                f"{row['Errors']} errors",
-                f"{row['Misclassification']:.2%} error rate",
-                delta_color="inverse"
-            )
+    st.caption(
+        "Five-fold cross-validation on the training data shows whether "
+        "performance is consistent across different training folds."
+    )
 
-    st.markdown("### What the comparison tells us")
+    cv_display = comparison_df[
+        [
+            "Model",
+            "CV Accuracy",
+            "CV Accuracy Std",
+            "CV F1",
+            "CV F1 Std",
+            "Accuracy",
+            "F1 Score",
+        ]
+    ].copy()
+
+    cv_display.columns = [
+        "Model",
+        "CV Accuracy",
+        "CV Accuracy SD",
+        "CV Weighted F1",
+        "CV F1 SD",
+        "Test Accuracy",
+        "Test Weighted F1",
+    ]
+
+    st.dataframe(
+        cv_display.style.format({
+            "CV Accuracy": "{:.2%}",
+            "CV Accuracy SD": "{:.4f}",
+            "CV Weighted F1": "{:.4f}",
+            "CV F1 SD": "{:.4f}",
+            "Test Accuracy": "{:.2%}",
+            "Test Weighted F1": "{:.4f}",
+        }),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    cv_fig, cv_ax = plt.subplots(figsize=(10, 5))
+
+    x = np.arange(len(comparison_df))
+    width = 0.35
+
+    cv_ax.bar(
+        x - width / 2,
+        comparison_df["CV Accuracy"],
+        width,
+        label="5-Fold CV Accuracy",
+    )
+
+    cv_ax.bar(
+        x + width / 2,
+        comparison_df["Accuracy"],
+        width,
+        label="Test Accuracy",
+    )
+
+    cv_ax.set_xticks(x)
+    cv_ax.set_xticklabels(comparison_df["Model"], rotation=15)
+    cv_ax.set_ylabel("Accuracy")
+    cv_ax.set_ylim(
+        0,
+        min(1.0, max(
+            comparison_df["CV Accuracy"].max(),
+            comparison_df["Accuracy"].max(),
+        ) * 1.12),
+    )
+    cv_ax.set_title(
+        "Cross-Validation vs Held-Out Test Accuracy",
+        fontweight="bold",
+    )
+    cv_ax.legend()
+    cv_ax.grid(axis="y", alpha=0.20)
+
+    plt.tight_layout()
+    st.pyplot(cv_fig, width="stretch")
+    plt.close(cv_fig)
+
+    # Stability interpretation
+    best_cv = comparison_df.sort_values(
+        "CV Accuracy",
+        ascending=False,
+    ).iloc[0]
 
     st.info(
-        f"**{winner['Model']} is the strongest overall model** based on the average of the five "
-        f"main performance metrics. It achieves **{winner['Accuracy']:.2%} accuracy**, "
-        f"a weighted F1-score of **{winner['F1 Score']:.4f}**, and ROC-AUC of **{winner['ROC-AUC']:.4f}**. "
-        f"It made **{int(winner['Errors'])} classification errors out of {int(winner['Test Size'])} test cases**. "
-        "For this dataset, the model with the strongest overall test performance is therefore the most suitable "
-        "candidate for the final prediction system."
+        f"**Stability insight:** {best_cv['Model']} has the highest "
+        f"five-fold CV accuracy at **{best_cv['CV Accuracy']:.2%}**. "
+        f"{winner['Model']} also achieves a test accuracy of "
+        f"**{winner['Accuracy']:.2%}**, indicating strong predictive "
+        f"performance on the held-out test set."
     )
 
     # --------------------------------------------------------
-    # Optional: detailed pairwise view
+    # 4. CLASS-LEVEL PERFORMANCE
     # --------------------------------------------------------
-    with st.expander("View detailed metric differences"):
-        detail_metric = st.selectbox(
-            "Metric",
-            ["Accuracy", "F1 Score", "Precision", "Recall", "ROC-AUC"],
-            key="detail_metric"
-        )
-        detail = comparison_numeric[["Model", detail_metric]].copy()
-        detail["Difference from best"] = detail[detail_metric] - winner[detail_metric]
-        detail["Difference from best"] = detail["Difference from best"].map(lambda x: f"{x:+.4f}")
-        st.dataframe(detail, width="stretch", hide_index=True)
+    st.markdown("### 3. Class-Level Performance")
 
-else:
-    st.warning("No model evaluation artifacts are currently available for comparison.")
+    class_model = st.selectbox(
+        "Select a model for class-level analysis",
+        list(comparison_artifacts.keys()),
+        key="class_level_model",
+    )
+
+    class_artifact = comparison_artifacts[class_model]
+
+    report_dict = classification_report(
+        class_artifact["y_true"],
+        class_artifact["y_pred"],
+        labels=class_artifact["classes"],
+        output_dict=True,
+        zero_division=0,
+    )
+
+    class_rows = []
+
+    for class_name in class_artifact["classes"]:
+        if class_name in report_dict:
+            class_rows.append({
+                "Class": class_name,
+                "Precision": report_dict[class_name]["precision"],
+                "Recall": report_dict[class_name]["recall"],
+                "F1 Score": report_dict[class_name]["f1-score"],
+                "Support": int(report_dict[class_name]["support"]),
+            })
+
+    class_df = pd.DataFrame(class_rows)
+
+    if not class_df.empty:
+
+        st.dataframe(
+            class_df.style.format({
+                "Precision": "{:.3f}",
+                "Recall": "{:.3f}",
+                "F1 Score": "{:.3f}",
+            }),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        class_fig, class_ax = plt.subplots(figsize=(10, 5))
+
+        bars = class_ax.barh(
+            class_df["Class"],
+            class_df["F1 Score"],
+        )
+
+        for bar, value in zip(bars, class_df["F1 Score"]):
+            class_ax.text(
+                value + 0.005,
+                bar.get_y() + bar.get_height() / 2,
+                f"{value:.3f}",
+                va="center",
+                fontweight="bold",
+            )
+
+        class_ax.set_xlim(
+            0,
+            min(1.0, max(class_df["F1 Score"]) * 1.12),
+        )
+        class_ax.set_xlabel("F1 Score")
+        class_ax.set_title(
+            f"Per-Class F1 Score — {class_model}",
+            fontweight="bold",
+        )
+        class_ax.grid(axis="x", alpha=0.20)
+        class_ax.spines[["top", "right", "left"]].set_visible(False)
+
+        plt.tight_layout()
+        st.pyplot(class_fig, width="stretch")
+        plt.close(class_fig)
+
+        weakest = class_df.loc[class_df["F1 Score"].idxmin()]
+        strongest = class_df.loc[class_df["F1 Score"].idxmax()]
+
+        st.info(
+            f"**Class-level insight:** The strongest class for "
+            f"{class_model} is **{strongest['Class']}** "
+            f"(F1 = {strongest['F1 Score']:.3f}), while the weakest is "
+            f"**{weakest['Class']}** (F1 = {weakest['F1 Score']:.3f}). "
+            "This highlights which obesity categories are easier or harder "
+            "for the selected model to distinguish."
+        )
+
+    # --------------------------------------------------------
+    # Confusion matrix
+    # --------------------------------------------------------
+    st.markdown("#### Confusion Matrix")
+
+    cm = pd.crosstab(
+        pd.Series(
+            class_artifact["y_true"],
+            name="Actual",
+        ),
+        pd.Series(
+            class_artifact["y_pred"],
+            name="Predicted",
+        ),
+    )
+
+    cm = cm.reindex(
+        index=class_artifact["classes"],
+        columns=class_artifact["classes"],
+        fill_value=0,
+    )
+
+    cm_fig, cm_ax = plt.subplots(figsize=(10, 7))
+
+    sns.heatmap(
+        cm,
+        annot=True,
+        fmt="d",
+        cmap="Blues",
+        cbar=True,
+        ax=cm_ax,
+    )
+
+    cm_ax.set_title(
+        f"Confusion Matrix — {class_model}",
+        fontweight="bold",
+    )
+    cm_ax.set_xlabel("Predicted")
+    cm_ax.set_ylabel("Actual")
+    plt.xticks(rotation=45, ha="right")
+    plt.yticks(rotation=0)
+    plt.tight_layout()
+
+    st.pyplot(cm_fig, width="stretch")
+    plt.close(cm_fig)
+
+    # --------------------------------------------------------
+    # 5. MISCLASSIFICATION ANALYSIS
+    # --------------------------------------------------------
+    st.markdown("### 4. Misclassification Analysis")
+
+    mis_rows = []
+
+    for model_name, artifact in comparison_artifacts.items():
+
+        y_true = artifact["y_true"]
+        y_pred = artifact["y_pred"]
+
+        incorrect = y_true != y_pred
+        errors = int(incorrect.sum())
+        total = len(y_true)
+
+        mis_rows.append({
+            "Model": model_name,
+            "Misclassified": errors,
+            "Total": total,
+            "Error Rate": errors / total,
+        })
+
+    mis_df = pd.DataFrame(mis_rows).sort_values(
+        "Error Rate"
+    ).reset_index(drop=True)
+
+    mis_df["Rank"] = np.arange(1, len(mis_df) + 1)
+
+    mis_cols = st.columns(len(mis_df))
+
+    for col, (_, row) in zip(mis_cols, mis_df.iterrows()):
+        with col:
+            st.metric(
+                f"#{int(row['Rank'])} {row['Model']}",
+                f"{int(row['Misclassified'])} errors",
+                f"{row['Error Rate']:.2%}",
+            )
+
+    mis_fig, mis_ax = plt.subplots(figsize=(10, 5))
+
+    bars = mis_ax.barh(
+        mis_df["Model"],
+        mis_df["Error Rate"],
+    )
+
+    for bar, value in zip(bars, mis_df["Error Rate"]):
+        mis_ax.text(
+            value + 0.002,
+            bar.get_y() + bar.get_height() / 2,
+            f"{value:.2%}",
+            va="center",
+            fontweight="bold",
+        )
+
+    mis_ax.set_xlabel("Misclassification Rate")
+    mis_ax.set_title(
+        "Misclassification Rate — Lower is Better",
+        fontweight="bold",
+    )
+    mis_ax.grid(axis="x", alpha=0.20)
+    mis_ax.spines[["top", "right", "left"]].set_visible(False)
+
+    plt.tight_layout()
+    st.pyplot(mis_fig, width="stretch")
+    plt.close(mis_fig)
+
+    selected_mis_model = st.selectbox(
+        "Inspect the most common errors",
+        list(comparison_artifacts.keys()),
+        key="selected_misclassification_model",
+    )
+
+    selected_artifact = comparison_artifacts[selected_mis_model]
+
+    error_df = pd.DataFrame({
+        "Actual": selected_artifact["y_true"],
+        "Predicted": selected_artifact["y_pred"],
+    })
+
+    error_df = error_df[
+        error_df["Actual"] != error_df["Predicted"]
+    ]
+
+    if not error_df.empty:
+
+        top_errors = (
+            error_df
+            .groupby(["Actual", "Predicted"])
+            .size()
+            .reset_index(name="Count")
+            .sort_values("Count", ascending=False)
+            .head(5)
+        )
+
+        top_errors["Misclassification"] = (
+            top_errors["Actual"].astype(str)
+            + " → "
+            + top_errors["Predicted"].astype(str)
+        )
+
+        top_errors = top_errors[
+            ["Misclassification", "Count"]
+        ]
+
+        st.dataframe(
+            top_errors,
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        total_errors = len(error_df)
+        total_cases = len(selected_artifact["y_true"])
+
+        st.caption(
+            f"{selected_mis_model} made **{total_errors} errors out of "
+            f"{total_cases} test cases ({total_errors / total_cases:.2%})**."
+        )
+
+    # --------------------------------------------------------
+    # Analytical interpretation
+    # --------------------------------------------------------
+    st.markdown("#### What the misclassifications tell us")
+
+    xgb_errors = None
+    rf_errors = None
+    knn_errors = None
+    lr_errors = None
+
+    for _, row in mis_df.iterrows():
+        if row["Model"] == "XGBoost":
+            xgb_errors = int(row["Misclassified"])
+        elif row["Model"] == "Random Forest":
+            rf_errors = int(row["Misclassified"])
+        elif row["Model"] == "K-Nearest Neighbours (KNN)":
+            knn_errors = int(row["Misclassified"])
+        elif row["Model"] == "Logistic Regression":
+            lr_errors = int(row["Misclassified"])
+
+    if xgb_errors is not None and knn_errors is not None:
+        st.info(
+            f"**XGBoost makes {knn_errors - xgb_errors} fewer errors than KNN** "
+            f"({xgb_errors} vs {knn_errors}) on the same 627 test cases. "
+            f"Random Forest makes {rf_errors} errors and Logistic Regression "
+            f"makes {lr_errors} errors. This provides stronger evidence for "
+            "the final model choice than accuracy alone."
+        )
+
+    # --------------------------------------------------------
+    # 6. MODEL STRENGTHS AND WEAKNESSES
+    # --------------------------------------------------------
+    st.markdown("### 5. Model Strengths and Weaknesses")
+
+    strengths = {
+        "Logistic Regression": (
+            "Strong baseline, simple to interpret and computationally efficient.",
+            "Lower predictive performance than the tree-based models and KNN."
+        ),
+        "K-Nearest Neighbours (KNN)": (
+            "Simple distance-based approach that can capture local patterns.",
+            "Highest error rate among the four models and weaker class separation."
+        ),
+        "Random Forest": (
+            "Captures nonlinear relationships and feature interactions while "
+            "providing useful feature-importance information.",
+            "More complex than Logistic Regression and still produces more errors "
+            "than XGBoost."
+        ),
+        "XGBoost": (
+            "Strongest overall predictive performance, lowest error rate and "
+            "excellent ROC-AUC.",
+            "More complex to tune and less directly interpretable than Logistic Regression."
+        ),
+    }
+
+    strength_df = pd.DataFrame([
+        {
+            "Model": name,
+            "Strength": strengths[name][0],
+            "Limitation": strengths[name][1],
+        }
+        for name in comparison_df["Model"]
+        if name in strengths
+    ])
+
+    st.dataframe(
+        strength_df,
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    # --------------------------------------------------------
+    # Final model selection
+    # --------------------------------------------------------
+    st.markdown("### Final Model Selection")
+
+    st.success(
+        f"""
+        **Selected model: {winner["Model"]}**
+
+        The model is selected because it provides the strongest overall
+        combination of Accuracy, Precision, Recall, weighted F1-score and
+        ROC-AUC. It also produces the lowest number of classification errors
+        on the held-out test set.
+
+        This makes **{winner["Model"]}** the most suitable candidate for the
+        final obesity-level prediction system for this dataset.
+        """
+    )
+
+    # --------------------------------------------------------
+    # Limitations and future improvements
+    # --------------------------------------------------------
+    with st.expander("Limitations and Future Improvements"):
+
+        st.markdown(
+            """
+            **Limitations**
+
+            - Evaluation is based on the available dataset and a single
+              held-out test split of 627 observations.
+            - Similar neighbouring obesity categories can overlap in feature
+              space, which can lead to confusion between adjacent classes.
+            - High predictive performance on this dataset does not guarantee
+              identical performance on a different population or external dataset.
+            - Feature importance should be interpreted as model association,
+              not as proof of causal relationships.
+
+            **Future Improvements**
+
+            - Validate the selected model on an independent external dataset.
+            - Investigate the weakest-performing classes in greater detail.
+            - Perform additional hyperparameter optimisation where appropriate.
+            - Apply explainable-AI methods such as SHAP to improve model
+              interpretability.
+            - Monitor model performance after deployment.
+            """
+        )
+
+    # --------------------------------------------------------
+    # Detailed metric differences
+    # --------------------------------------------------------
+    with st.expander("View Detailed Metric Differences"):
+
+        detail_metric = st.selectbox(
+            "Select metric",
+            [
+                "Accuracy",
+                "Precision",
+                "Recall",
+                "F1 Score",
+                "ROC-AUC",
+            ],
+            key="detail_metric_high_mark",
+        )
+
+        detail_df = comparison_df[
+            ["Rank", "Model", detail_metric]
+        ].copy()
+
+        best_value = comparison_df.iloc[0][detail_metric]
+
+        detail_df["Difference from Best"] = (
+            detail_df[detail_metric] - best_value
+        )
+
+        st.dataframe(
+            detail_df.style.format({
+                detail_metric: "{:.4f}",
+                "Difference from Best": "{:+.4f}",
+            }),
+            use_container_width=True,
+            hide_index=True,
+        )
 
 
 # ============================================================
@@ -1130,204 +1754,4 @@ else:
 # ============================================================
 
 st.markdown("---")
-
-st.caption(
-    "Obesity Levels dataset — UCI Machine Learning Repository"
-)
-
-# ============================================================
-# MISCLASSIFICATION COMPARISON
-# ============================================================
-
-def get_misclassification_data(y_true, y_pred):
-    """Calculate error count, error rate, and top 5 errors."""
-    y_true_s = pd.Series(y_true).reset_index(drop=True)
-    y_pred_s = pd.Series(y_pred).reset_index(drop=True)
-
-    total = len(y_true_s)
-    incorrect = y_true_s != y_pred_s
-    errors = int(incorrect.sum())
-    error_rate = errors / total * 100 if total else 0.0
-
-    error_df = pd.DataFrame({
-        "Actual": y_true_s[incorrect],
-        "Predicted": y_pred_s[incorrect]
-    })
-
-    if error_df.empty:
-        common = pd.DataFrame(columns=["Actual", "Predicted", "Count"])
-    else:
-        common = (
-            error_df.groupby(["Actual", "Predicted"])
-            .size()
-            .reset_index(name="Count")
-            .sort_values("Count", ascending=False)
-            .head(5)
-        )
-
-    return total, errors, error_rate, common
-
-
-# Load each model's own saved test labels and predictions.
-model_predictions = {}
-model_test_labels = {}
-
-for model_name, config in MODEL_REGISTRY.items():
-    if not config.get("available", False):
-        continue
-
-    try:
-        _, _, model_y_test, model_y_pred, _ = load_artifacts(config)
-
-        model_test_labels[model_name] = (
-            np.asarray(model_y_test).ravel().astype(str)
-        )
-
-        model_predictions[model_name] = (
-            np.asarray(model_y_pred).ravel().astype(str)
-        )
-
-    except Exception as exc:
-        st.warning(
-            f"Could not load misclassification data for "
-            f"{model_name}: {exc}"
-        )
-
-misclassification_results = {}
-
-for model_name, predictions in model_predictions.items():
-    total, errors, error_rate, common = get_misclassification_data(
-        y_test, predictions
-    )
-    misclassification_results[model_name] = {
-        "total": total,
-        "errors": errors,
-        "error_rate": error_rate,
-        "common": common,
-    }
-
-ranking = sorted(
-    misclassification_results.items(),
-    key=lambda item: item[1]["error_rate"]
-)
-
-best_model, best_result = ranking[0]
-
-st.markdown("---")
-st.markdown("## Misclassification Comparison")
-st.caption("Lower error rate indicates better classification performance.")
-
-st.success(
-    f"🏆 Best model by misclassification rate: **{best_model}** — "
-    f"{best_result['errors']} / {best_result['total']} errors "
-    f"({best_result['error_rate']:.2f}%)"
-)
-
-# Model cards
-cols = st.columns(4)
-medals = ["🥇", "🥈", "🥉", ""]
-
-for col, (model_name, result), medal in zip(cols, ranking, medals):
-    with col:
-        st.markdown(f"### {medal} {model_name}")
-        st.metric("Misclassified", f"{result['errors']} / {result['total']}")
-        st.metric("Error Rate", f"{result['error_rate']:.2f}%")
-
-# Comparison table
-comparison_df = pd.DataFrame([
-    {
-        "Rank": i + 1,
-        "Model": model_name,
-        "Misclassified": result["errors"],
-        "Total": result["total"],
-        "Error Rate (%)": result["error_rate"],
-    }
-    for i, (model_name, result) in enumerate(ranking)
-])
-
-st.markdown("### Overall Misclassification Ranking")
-st.dataframe(
-    comparison_df.style.format({"Error Rate (%)": "{:.2f}%"}),
-    use_container_width=True,
-    hide_index=True,
-)
-
-# Chart
-try:
-    import plotly.express as px
-
-    fig = px.bar(
-        comparison_df,
-        x="Model",
-        y="Error Rate (%)",
-        text="Error Rate (%)",
-        title="Misclassification Rate by Model",
-    )
-    fig.update_traces(
-        texttemplate="%{text:.2f}%",
-        textposition="outside",
-    )
-    fig.update_layout(
-        yaxis_title="Misclassification Rate (%)",
-        xaxis_title="",
-        yaxis_range=[0, max(comparison_df["Error Rate (%)"]) * 1.25],
-        showlegend=False,
-    )
-    st.plotly_chart(fig, use_container_width=True)
-except ImportError:
-    st.bar_chart(
-        comparison_df.set_index("Model")["Error Rate (%)"],
-        use_container_width=True,
-    )
-
-# Detailed errors
-st.markdown("### Most Common Misclassifications")
-
-selected_model = st.selectbox(
-    "Select a model:",
-    [name for name, _ in ranking],
-    key="misclassification_model",
-)
-
-selected = misclassification_results[selected_model]
-
-st.write(
-    f"**{selected_model}:** {selected['errors']} misclassified "
-    f"samples out of {selected['total']} "
-    f"({selected['error_rate']:.2f}%)."
-)
-
-if not selected["common"].empty:
-    display_errors = selected["common"].copy()
-    display_errors["Misclassification"] = (
-        display_errors["Actual"].astype(str)
-        + " → "
-        + display_errors["Predicted"].astype(str)
-    )
-    display_errors = display_errors[["Misclassification", "Count"]]
-
-    st.dataframe(
-        display_errors,
-        use_container_width=True,
-        hide_index=True,
-    )
-else:
-    st.info("No misclassifications found.")
-
-# Interpretation
-st.markdown("### What the comparison tells us")
-
-st.write(
-    f"**{best_model}** has the lowest misclassification rate at "
-    f"**{best_result['error_rate']:.2f}%**, with only "
-    f"**{best_result['errors']} incorrect predictions** out of "
-    f"**{best_result['total']}** test samples."
-)
-
-st.write(
-    "The models are ranked from lowest to highest error rate: "
-    + " → ".join(
-        f"{name} ({result['error_rate']:.2f}%)"
-        for name, result in ranking
-    )
-)
+st.caption("Obesity Levels dataset — UCI Machine Learning Repository")
