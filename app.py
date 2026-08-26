@@ -721,7 +721,6 @@ st.markdown("---")
 # RESULTS NAVIGATION
 # ============================================================
 
-st.markdown("---")
 
 section = st.radio(
     "View Results",
