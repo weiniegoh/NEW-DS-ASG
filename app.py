@@ -846,6 +846,7 @@ st.markdown("---")
 section = st.radio(
     "View Results",
     [
+        "Model Comparison",  
         "Confusion Matrix",
         "Classification Report",
         "Feature Importance",
@@ -857,7 +858,89 @@ section = st.radio(
 
 st.markdown("")
 
+# ============================================================
+# MODEL COMPARISON
+# ============================================================
 
+if section == "Model Comparison":
+
+    st.subheader("Model Comparison")
+    st.caption("Live-computed metrics across all available models, from held-out test-set predictions.")
+
+    @st.cache_data
+    def compute_comparison_metrics():
+        rows = []
+        for name, config in MODEL_REGISTRY.items():
+            if not config.get("available"):
+                continue
+            y_test = joblib.load(config["y_test_path"])
+            y_pred = joblib.load(config["y_pred_path"])
+            y_proba = joblib.load(config["y_proba_path"])
+
+            acc = accuracy_score(y_test, y_pred)
+            f1w = f1_score(y_test, y_pred, average="weighted")
+            prec = precision_score(y_test, y_pred, average="weighted")
+            rec = recall_score(y_test, y_pred, average="weighted")
+
+            classes = sorted(pd.Series(y_test).unique())
+            y_test_bin = label_binarize(y_test, classes=classes)
+            roc_auc = roc_auc_score(y_test_bin, y_proba, multi_class="ovr", average="weighted")
+
+            misclass_pct = (y_test != y_pred).mean() * 100
+
+            rows.append({
+                "Model": name,
+                "Accuracy": acc,
+                "Weighted F1": f1w,
+                "Precision": prec,
+                "Recall": rec,
+                "ROC-AUC": roc_auc,
+                "Misclassified (%)": misclass_pct,
+            })
+        return pd.DataFrame(rows)
+
+    comparison_df = compute_comparison_metrics()
+
+    if comparison_df.empty:
+        st.warning("No models are marked available yet.")
+    else:
+        st.dataframe(
+            comparison_df.style.format({
+                "Accuracy": "{:.4f}", "Weighted F1": "{:.4f}",
+                "Precision": "{:.4f}", "Recall": "{:.4f}",
+                "ROC-AUC": "{:.4f}", "Misclassified (%)": "{:.2f}%"
+            }),
+            width="stretch", hide_index=True
+        )
+
+        metrics_to_plot = ["Accuracy", "Weighted F1", "ROC-AUC"]
+        fig, ax = plt.subplots(figsize=(9, 5))
+        x = np.arange(len(comparison_df))
+        width = 0.25
+        for i, metric in enumerate(metrics_to_plot):
+            offset = (i - 1) * width
+            bars = ax.bar(x + offset, comparison_df[metric], width, label=metric)
+            for b in bars:
+                h = b.get_height()
+                ax.annotate(f"{h:.3f}", xy=(b.get_x()+b.get_width()/2, h),
+                            xytext=(0,3), textcoords="offset points",
+                            ha="center", fontsize=7)
+        ax.set_xticks(x)
+        ax.set_xticklabels(comparison_df["Model"], fontsize=9)
+        ax.set_ylim(0.75, 1.03)
+        ax.set_ylabel("Score")
+        ax.set_title("Model Performance Comparison")
+        ax.legend(loc="lower right", fontsize=8)
+        ax.grid(axis="y", alpha=0.3)
+        st.pyplot(fig)
+
+        fig2, ax2 = plt.subplots(figsize=(7, 4.5))
+        ax2.bar(comparison_df["Model"], comparison_df["Misclassified (%)"], color="#C44E52")
+        ax2.set_ylabel("Misclassification Rate (%)")
+        ax2.set_title("Test-Set Misclassification Rate")
+        ax2.grid(axis="y", alpha=0.3)
+        st.pyplot(fig2)
+        
 # ============================================================
 # CONFUSION MATRIX
 # ============================================================
