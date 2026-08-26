@@ -835,7 +835,96 @@ st.dataframe(
     width="stretch",
     hide_index=True
 )
+# ------------------------------------------------------------
+# Comparison chart (numeric values, same source as the table above)
+# ------------------------------------------------------------
 
+def calculate_model_metrics_numeric(model_name):
+    """Same computation as calculate_model_metrics, but returns raw
+    floats instead of formatted strings, so it can be charted."""
+
+    config = MODEL_REGISTRY[model_name]
+    if not config.get("available", False):
+        return None
+
+    try:
+        loaded_model, _, loaded_y_test, loaded_y_pred, loaded_y_proba = (
+            load_artifacts(config)
+        )
+
+        loaded_y_test = np.asarray(loaded_y_test).ravel().astype(str)
+        loaded_y_pred = np.asarray(loaded_y_pred).ravel().astype(str)
+
+        if model_name == "XGBoost":
+            loaded_classes = XGB_CLASS_NAMES
+        else:
+            loaded_classes = np.asarray(loaded_model.classes_).astype(str)
+
+        loaded_y_test_bin = label_binarize(loaded_y_test, classes=loaded_classes)
+
+        return {
+            "Model": model_name,
+            "Accuracy": accuracy_score(loaded_y_test, loaded_y_pred),
+            "F1 (Weighted)": f1_score(loaded_y_test, loaded_y_pred, average="weighted"),
+            "ROC-AUC (Macro)": roc_auc_score(
+                loaded_y_test_bin, loaded_y_proba, average="macro", multi_class="ovr"
+            ),
+            "Misclassified (%)": (loaded_y_test != loaded_y_pred).mean() * 100,
+        }
+    except Exception:
+        return None
+
+
+numeric_rows = [
+    r for r in (calculate_model_metrics_numeric(m) for m in MODEL_REGISTRY.keys())
+    if r is not None
+]
+
+if numeric_rows:
+    numeric_df = pd.DataFrame(numeric_rows)
+
+    # ---- Chart 1: Accuracy / F1 / ROC-AUC ----
+    fig, ax = plt.subplots(figsize=(12, 6))
+    x = np.arange(len(numeric_df))
+    width = 0.25
+    metrics_plot = ["Accuracy", "F1 (Weighted)", "ROC-AUC (Macro)"]
+    colors = ["#4C72B0", "#55A868", "#C44E52"]
+
+    for i, metric in enumerate(metrics_plot):
+        offset = (i - 1) * width
+        bars = ax.bar(x + offset, numeric_df[metric], width, label=metric, color=colors[i])
+        for b in bars:
+            h = b.get_height()
+            ax.annotate(f"{h:.3f}", xy=(b.get_x() + b.get_width()/2, h),
+                        xytext=(0, 3), textcoords="offset points",
+                        ha="center", fontsize=8)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(numeric_df["Model"], fontsize=9, rotation=15, ha="right")
+    ax.set_ylim(0.70, 1.05)
+    ax.set_ylabel("Score")
+    ax.set_title("Model Performance Comparison", fontsize=13, fontweight="bold")
+    ax.legend(loc="lower right", fontsize=9)
+    ax.grid(axis="y", alpha=0.3)
+    plt.tight_layout()
+    st.pyplot(fig)
+    plt.close(fig)
+
+    # ---- Chart 2: Misclassification rate ----
+    fig2, ax2 = plt.subplots(figsize=(9, 5))
+    bars2 = ax2.bar(numeric_df["Model"], numeric_df["Misclassified (%)"], color="#C44E52")
+    for b in bars2:
+        h = b.get_height()
+        ax2.annotate(f"{h:.2f}%", xy=(b.get_x() + b.get_width()/2, h),
+                     xytext=(0, 3), textcoords="offset points", ha="center", fontsize=9)
+    ax2.set_xticklabels(numeric_df["Model"], rotation=15, ha="right", fontsize=9)
+    ax2.set_ylabel("Misclassification Rate (%)")
+    ax2.set_title("Test-Set Misclassification Rate", fontsize=13, fontweight="bold")
+    ax2.grid(axis="y", alpha=0.3)
+    plt.tight_layout()
+    st.pyplot(fig2)
+    plt.close(fig2)
+    gc.collect()
 
 # ============================================================
 # RESULTS NAVIGATION
@@ -846,7 +935,6 @@ st.markdown("---")
 section = st.radio(
     "View Results",
     [
-        "Model Comparison",  
         "Confusion Matrix",
         "Classification Report",
         "Feature Importance",
@@ -858,89 +946,7 @@ section = st.radio(
 
 st.markdown("")
 
-# ============================================================
-# MODEL COMPARISON
-# ============================================================
 
-if section == "Model Comparison":
-
-    st.subheader("Model Comparison")
-    st.caption("Live-computed metrics across all available models, from held-out test-set predictions.")
-
-    @st.cache_data
-    def compute_comparison_metrics():
-        rows = []
-        for name, config in MODEL_REGISTRY.items():
-            if not config.get("available"):
-                continue
-            y_test = joblib.load(config["y_test_path"])
-            y_pred = joblib.load(config["y_pred_path"])
-            y_proba = joblib.load(config["y_proba_path"])
-
-            acc = accuracy_score(y_test, y_pred)
-            f1w = f1_score(y_test, y_pred, average="weighted")
-            prec = precision_score(y_test, y_pred, average="weighted")
-            rec = recall_score(y_test, y_pred, average="weighted")
-
-            classes = sorted(pd.Series(y_test).unique())
-            y_test_bin = label_binarize(y_test, classes=classes)
-            roc_auc = roc_auc_score(y_test_bin, y_proba, multi_class="ovr", average="weighted")
-
-            misclass_pct = (y_test != y_pred).mean() * 100
-
-            rows.append({
-                "Model": name,
-                "Accuracy": acc,
-                "Weighted F1": f1w,
-                "Precision": prec,
-                "Recall": rec,
-                "ROC-AUC": roc_auc,
-                "Misclassified (%)": misclass_pct,
-            })
-        return pd.DataFrame(rows)
-
-    comparison_df = compute_comparison_metrics()
-
-    if comparison_df.empty:
-        st.warning("No models are marked available yet.")
-    else:
-        st.dataframe(
-            comparison_df.style.format({
-                "Accuracy": "{:.4f}", "Weighted F1": "{:.4f}",
-                "Precision": "{:.4f}", "Recall": "{:.4f}",
-                "ROC-AUC": "{:.4f}", "Misclassified (%)": "{:.2f}%"
-            }),
-            width="stretch", hide_index=True
-        )
-
-        metrics_to_plot = ["Accuracy", "Weighted F1", "ROC-AUC"]
-        fig, ax = plt.subplots(figsize=(9, 5))
-        x = np.arange(len(comparison_df))
-        width = 0.25
-        for i, metric in enumerate(metrics_to_plot):
-            offset = (i - 1) * width
-            bars = ax.bar(x + offset, comparison_df[metric], width, label=metric)
-            for b in bars:
-                h = b.get_height()
-                ax.annotate(f"{h:.3f}", xy=(b.get_x()+b.get_width()/2, h),
-                            xytext=(0,3), textcoords="offset points",
-                            ha="center", fontsize=7)
-        ax.set_xticks(x)
-        ax.set_xticklabels(comparison_df["Model"], fontsize=9)
-        ax.set_ylim(0.75, 1.03)
-        ax.set_ylabel("Score")
-        ax.set_title("Model Performance Comparison")
-        ax.legend(loc="lower right", fontsize=8)
-        ax.grid(axis="y", alpha=0.3)
-        st.pyplot(fig)
-
-        fig2, ax2 = plt.subplots(figsize=(7, 4.5))
-        ax2.bar(comparison_df["Model"], comparison_df["Misclassified (%)"], color="#C44E52")
-        ax2.set_ylabel("Misclassification Rate (%)")
-        ax2.set_title("Test-Set Misclassification Rate")
-        ax2.grid(axis="y", alpha=0.3)
-        st.pyplot(fig2)
-        
 # ============================================================
 # CONFUSION MATRIX
 # ============================================================
