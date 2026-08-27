@@ -200,16 +200,16 @@ gender = st.sidebar.selectbox(
 
 age = st.sidebar.number_input(
     "Age (years)",
-    min_value=1,
-    max_value=100,
+    min_value=14,
+    max_value=61,
     value=25,
     key="input_age"
 )
 
 height = st.sidebar.number_input(
     "Height (m)",
-    min_value=1.0,
-    max_value=2.5,
+    min_value=1.45,
+    max_value=1.98,
     value=1.70,
     step=0.01,
     key="input_height"
@@ -217,8 +217,8 @@ height = st.sidebar.number_input(
 
 weight = st.sidebar.number_input(
     "Weight (kg)",
-    min_value=20.0,
-    max_value=250.0,
+    min_value=39.0,
+    max_value=173.0,
     value=70.0,
     step=0.5,
     key="input_weight"
@@ -240,6 +240,11 @@ bmi = weight / (height ** 2)
 st.sidebar.metric(
     "Calculated BMI",
     f"{bmi:.2f}"
+)
+
+st.sidebar.caption(
+    "BMI is shown for reference only and is not used as an input "
+    "feature by the trained models."
 )
 
 
@@ -351,16 +356,10 @@ mtrans = st.sidebar.selectbox(
 if not selected_config.get("available", False):
 
     st.info(
-        f"**{selected_model_name}** has not been imported yet. "
-        "The model will appear here once its trained model and "
-        "prediction artifacts are added."
+        f"**{selected_model_name}** is currently unavailable. "
+        "Its trained model and evaluation artifacts have not been added yet."
     )
-
-    # --------------------------------------------------------
-    # MODEL COMPARISON TABLE STILL SHOWN
-    # --------------------------------------------------------
-
-    st.header("Model Comparison")
+    st.stop()
 
 
 
@@ -403,25 +402,28 @@ accuracy = accuracy_score(
 f1_weighted = f1_score(
     y_test,
     y_pred,
-    average="weighted"
+    average="weighted",
+    zero_division=0
 )
 
 precision_w = precision_score(
     y_test,
     y_pred,
-    average="weighted"
+    average="weighted",
+    zero_division=0
 )
 
 recall_w = recall_score(
     y_test,
     y_pred,
-    average="weighted"
+    average="weighted",
+    zero_division=0
 )
 
-roc_auc_macro = roc_auc_score(
+roc_auc_weighted = roc_auc_score(
     y_test_binarized,
-    y_proba,
-    average="macro",
+    np.asarray(y_proba),
+    average="weighted",
     multi_class="ovr"
 )
 
@@ -571,8 +573,8 @@ col4.metric(
 )
 
 col5.metric(
-    "ROC-AUC (Macro)",
-    f"{roc_auc_macro:.4f}"
+    "ROC-AUC (Weighted, OvR)",
+    f"{roc_auc_weighted:.4f}"
 )
 
 
@@ -850,16 +852,17 @@ st.markdown("---")
 st.header("Model Comparison")
 st.caption(
     "Analytical comparison of Logistic Regression, KNN, Random Forest and "
-    "XGBoost using the same 627-sample held-out test set."
+    "XGBoost using the same saved held-out test set."
 )
 
 
 # ------------------------------------------------------------
 # Notebook cross-validation results
 # ------------------------------------------------------------
-# These values come directly from the project's notebook.
-# Test-set metrics and misclassifications are still calculated
-# dynamically from the saved prediction artifacts.
+# These values come directly from the project's existing executed notebook.
+# This app-only version intentionally keeps them hard-coded so no other project
+# files need to be changed. Held-out test metrics are calculated from the saved
+# prediction/probability artifacts currently used by the project.
 CV_RESULTS = {
     "Logistic Regression": {
         "CV Accuracy": 0.8568,
@@ -922,6 +925,18 @@ def build_model_comparison():
             # Some artifacts can contain one extra dimension.
             if y_proba.ndim > 2:
                 y_proba = np.squeeze(y_proba)
+
+            # Validate the saved evaluation artifacts before comparing models.
+            if y_proba.ndim != 2:
+                raise ValueError("predict_proba artifact must be 2-D")
+            if len(y_true) != len(y_pred):
+                raise ValueError("prediction length does not match y_test")
+            if y_proba.shape[0] != len(y_true):
+                raise ValueError("probability row count does not match y_test")
+            if y_proba.shape[1] != len(classes):
+                raise ValueError("probability column count does not match class count")
+            if not np.allclose(y_proba.sum(axis=1), 1.0, atol=1e-4):
+                raise ValueError("class probabilities do not sum to 1")
 
             accuracy = accuracy_score(y_true, y_pred)
             precision = precision_score(
@@ -992,29 +1007,29 @@ if comparison_df.empty:
 else:
 
     # --------------------------------------------------------
-    # Overall score
+    # Model ranking
     # --------------------------------------------------------
-    score_metrics = [
-        "Accuracy",
-        "Precision",
-        "Recall",
-        "F1 Score",
-        "ROC-AUC",
-    ]
-
-    comparison_df["Overall Score"] = comparison_df[score_metrics].mean(
-        axis=1, skipna=True
-    )
-
+    # App-only approach: rank primarily by held-out weighted F1.
+    # Accuracy and weighted OvR ROC-AUC act as tie-breakers/supporting metrics.
     comparison_df = (
         comparison_df
-        .sort_values("Overall Score", ascending=False)
+        .sort_values(
+            by=["F1 Score", "Accuracy", "ROC-AUC"],
+            ascending=[False, False, False],
+            na_position="last",
+        )
         .reset_index(drop=True)
     )
 
     comparison_df["Rank"] = np.arange(1, len(comparison_df) + 1)
-
     winner = comparison_df.iloc[0]
+    shared_test_size = int(comparison_df["Test Size"].iloc[0])
+
+    st.caption(
+        f"All displayed held-out metrics use the same {shared_test_size}-sample "
+        "saved test set. The CV table uses the notebook results already embedded "
+        "in this app and is shown as supporting evidence."
+    )
 
     # --------------------------------------------------------
     # CSS
@@ -1075,22 +1090,24 @@ else:
         <div class="comparison-winner">
             <h2>🏆 Recommended Final Model: {winner["Model"]}</h2>
             <div>
-                The model has the strongest overall test performance across
-                Accuracy, Precision, Recall, weighted F1-score and ROC-AUC.
+                The model is selected primarily by held-out weighted F1-score.
+                Accuracy, weighted One-vs-Rest ROC-AUC, macro F1 and
+                misclassification results are used as supporting evidence.
             </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    winner_cols = st.columns(5)
+    winner_cols = st.columns(6)
 
     winner_metrics = [
-        ("Accuracy", winner["Accuracy"], "{:.2%}"),
+        ("Test Accuracy", winner["Accuracy"], "{:.2%}"),
         ("Weighted F1", winner["F1 Score"], "{:.4f}"),
+        ("Macro F1", winner["Macro F1"], "{:.4f}"),
         ("Precision", winner["Precision"], "{:.4f}"),
-        ("Recall", winner["Recall"], "{:.4f}"),
-        ("ROC-AUC", winner["ROC-AUC"], "{:.4f}"),
+        ("ROC-AUC (W)", winner["ROC-AUC"], "{:.4f}"),
+        ("Errors", winner["Errors"], "{:.0f}"),
     ]
 
     for col, (label, value, fmt) in zip(winner_cols, winner_metrics):
@@ -1146,6 +1163,7 @@ else:
             "Precision",
             "Recall",
             "F1 Score",
+            "Macro F1",
             "ROC-AUC",
             "Error Rate",
         ],
@@ -1206,6 +1224,7 @@ else:
             "Precision",
             "Recall",
             "F1 Score",
+            "Macro F1",
             "ROC-AUC",
             "Errors",
             "Error Rate",
@@ -1219,7 +1238,8 @@ else:
         "Precision",
         "Recall",
         "Weighted F1",
-        "ROC-AUC",
+        "Macro F1",
+        "ROC-AUC (Weighted, OvR)",
         "Errors",
         "Error Rate",
     ]
@@ -1230,7 +1250,8 @@ else:
             "Precision": "{:.4f}",
             "Recall": "{:.4f}",
             "Weighted F1": "{:.4f}",
-            "ROC-AUC": "{:.4f}",
+            "Macro F1": "{:.4f}",
+            "ROC-AUC (Weighted, OvR)": "{:.4f}",
             "Error Rate": "{:.2%}",
         }),
         use_container_width=True,
@@ -1240,7 +1261,7 @@ else:
     # --------------------------------------------------------
     # 3. CROSS-VALIDATION STABILITY
     # --------------------------------------------------------
-    st.markdown("### 2. Cross-Validation Stability")
+    st.markdown("### 2. Cross-Validation Performance")
 
     st.caption(
         "Five-fold cross-validation on the training data shows whether "
@@ -1322,18 +1343,24 @@ else:
     st.pyplot(cv_fig, width="stretch")
     plt.close(cv_fig)
 
-    # Stability interpretation
+    # Cross-validation interpretation. The values below are the saved
+    # notebook results and are supporting evidence in this app-only version.
     best_cv = comparison_df.sort_values(
         "CV Accuracy",
         ascending=False,
     ).iloc[0]
 
+    most_stable = comparison_df.sort_values(
+        "CV Accuracy Std",
+        ascending=True,
+    ).iloc[0]
+
     st.info(
-        f"**Stability insight:** {best_cv['Model']} has the highest "
-        f"five-fold CV accuracy at **{best_cv['CV Accuracy']:.2%}**. "
-        f"{winner['Model']} also achieves a test accuracy of "
-        f"**{winner['Accuracy']:.2%}**, indicating strong predictive "
-        f"performance on the held-out test set."
+        f"**Cross-validation insight:** {best_cv['Model']} has the highest "
+        f"saved five-fold CV accuracy at **{best_cv['CV Accuracy']:.2%}**. "
+        f"The smallest reported CV accuracy SD is for "
+        f"**{most_stable['Model']}** at **{most_stable['CV Accuracy Std']:.4f}**. "
+        "Mean CV performance and fold-to-fold variability are interpreted separately."
     )
 
     # --------------------------------------------------------
@@ -1597,29 +1624,20 @@ else:
     # --------------------------------------------------------
     st.markdown("#### What the misclassifications tell us")
 
-    xgb_errors = None
-    rf_errors = None
-    knn_errors = None
-    lr_errors = None
+    best_error_row = mis_df.iloc[0]
+    worst_error_row = mis_df.iloc[-1]
+    error_difference = (
+        int(worst_error_row["Misclassified"])
+        - int(best_error_row["Misclassified"])
+    )
 
-    for _, row in mis_df.iterrows():
-        if row["Model"] == "XGBoost":
-            xgb_errors = int(row["Misclassified"])
-        elif row["Model"] == "Random Forest":
-            rf_errors = int(row["Misclassified"])
-        elif row["Model"] == "K-Nearest Neighbours (KNN)":
-            knn_errors = int(row["Misclassified"])
-        elif row["Model"] == "Logistic Regression":
-            lr_errors = int(row["Misclassified"])
-
-    if xgb_errors is not None and knn_errors is not None:
-        st.info(
-            f"**XGBoost makes {knn_errors - xgb_errors} fewer errors than KNN** "
-            f"({xgb_errors} vs {knn_errors}) on the same 627 test cases. "
-            f"Random Forest makes {rf_errors} errors and Logistic Regression "
-            f"makes {lr_errors} errors. This provides stronger evidence for "
-            "the final model choice than accuracy alone."
-        )
+    st.info(
+        f"**Misclassification insight:** {best_error_row['Model']} makes the "
+        f"fewest errors ({int(best_error_row['Misclassified'])}) on the shared "
+        f"held-out test set, which is {error_difference} fewer than "
+        f"{worst_error_row['Model']} "
+        f"({int(worst_error_row['Misclassified'])})."
+    )
 
     # --------------------------------------------------------
     # 6. MODEL STRENGTHS AND WEAKNESSES
@@ -1628,23 +1646,20 @@ else:
 
     strengths = {
         "Logistic Regression": (
-            "Strong baseline, simple to interpret and computationally efficient.",
-            "Lower predictive performance than the tree-based models and KNN."
+            "Simple, interpretable and computationally efficient baseline.",
+            "Its linear decision structure may be less suitable for complex nonlinear relationships."
         ),
         "K-Nearest Neighbours (KNN)": (
-            "Simple distance-based approach that can capture local patterns.",
-            "Highest error rate among the four models and weaker class separation."
+            "Can capture local neighbourhood patterns without assuming a linear decision boundary.",
+            "Sensitive to feature scaling and distance definitions, and prediction cost grows with the training set."
         ),
         "Random Forest": (
-            "Captures nonlinear relationships and feature interactions while "
-            "providing useful feature-importance information.",
-            "More complex than Logistic Regression and still produces more errors "
-            "than XGBoost."
+            "Captures nonlinear relationships and feature interactions while providing feature-importance estimates.",
+            "Less directly interpretable than Logistic Regression and can be computationally heavier with many trees."
         ),
         "XGBoost": (
-            "Strongest overall predictive performance, lowest error rate and "
-            "excellent ROC-AUC.",
-            "More complex to tune and less directly interpretable than Logistic Regression."
+            "Boosted trees can model complex nonlinear patterns and interactions by sequentially correcting errors.",
+            "Requires careful tuning and is less directly interpretable than a linear baseline."
         ),
     }
 
@@ -1673,13 +1688,20 @@ else:
         f"""
         **Selected model: {winner["Model"]}**
 
-        The model is selected because it provides the strongest overall
-        combination of Accuracy, Precision, Recall, weighted F1-score and
-        ROC-AUC. It also produces the lowest number of classification errors
-        on the held-out test set.
+        The final model is selected primarily based on held-out weighted
+        F1-score, with accuracy, macro F1-score, weighted One-vs-Rest ROC-AUC
+        and misclassification count used as supporting evaluation measures.
 
-        This makes **{winner["Model"]}** the most suitable candidate for the
-        final obesity-level prediction system for this dataset.
+        On the shared held-out test set, **{winner["Model"]}** achieved an
+        accuracy of **{winner["Accuracy"]:.2%}**, weighted F1-score of
+        **{winner["F1 Score"]:.4f}**, macro F1-score of
+        **{winner["Macro F1"]:.4f}**, and weighted ROC-AUC of
+        **{winner["ROC-AUC"]:.4f}**. It produced **{int(winner["Errors"])}**
+        errors out of **{int(winner["Test Size"])}** test observations.
+
+        Based on the available saved model artifacts and held-out test results,
+        **{winner["Model"]}** is recommended as the final model for the
+        obesity-level classification prototype.
         """
     )
 
@@ -1693,7 +1715,7 @@ else:
             **Limitations**
 
             - Evaluation is based on the available dataset and a single
-              held-out test split of 627 observations.
+              held-out test split.
             - Similar neighbouring obesity categories can overlap in feature
               space, which can lead to confusion between adjacent classes.
             - High predictive performance on this dataset does not guarantee
@@ -1724,6 +1746,7 @@ else:
                 "Precision",
                 "Recall",
                 "F1 Score",
+                "Macro F1",
                 "ROC-AUC",
             ],
             key="detail_metric_high_mark",
@@ -1733,16 +1756,16 @@ else:
             ["Rank", "Model", detail_metric]
         ].copy()
 
-        best_value = comparison_df.iloc[0][detail_metric]
+        best_value = comparison_df[detail_metric].max()
 
-        detail_df["Difference from Best"] = (
-            detail_df[detail_metric] - best_value
+        detail_df["Gap from Best"] = (
+            best_value - detail_df[detail_metric]
         )
 
         st.dataframe(
             detail_df.style.format({
                 detail_metric: "{:.4f}",
-                "Difference from Best": "{:+.4f}",
+                "Gap from Best": "{:.4f}",
             }),
             use_container_width=True,
             hide_index=True,
