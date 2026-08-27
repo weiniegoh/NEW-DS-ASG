@@ -2770,13 +2770,13 @@ raw, clean, dataset_path = get_data()
 if page == "🏠 Overview":
     if raw is not None and clean is not None:
         render_overview_page(raw, clean)
-elif page == "🧹 Data Preparation":
+elif page == "⚙️ Data Preparation":
     if raw is not None and clean is not None:
         render_data_preparation_page(raw, clean)
 elif page == "🔍 Exploratory Analysis":
     if raw is not None and clean is not None:
         render_eda_page(raw, clean)
-elif page == "🤖 Model Evaluation":
+elif page == "🧪 Model Evaluation":
     render_model_evaluation_page()
 elif page == "🏆 Model Comparison":
     render_model_comparison_page()
