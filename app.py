@@ -2751,9 +2751,9 @@ page = st.sidebar.radio(
     "Navigation",
     [
         "🏠 Overview",
-        "🧹 Data Preparation",
+        "⚙️ Data Preparation",
         "🔍 Exploratory Analysis",
-        "🤖 Model Evaluation",
+        "🧪 Model Evaluation",
         "🏆 Model Comparison",
         "🔮 Prediction",
     ],
