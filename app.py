@@ -1,886 +1,272 @@
 """
-Obesity Level Classification — Model Comparison Dashboard
-============================================================
-Run with: streamlit run app.py
+BMDS2003 Data Science — Obesity Risk Analytics & Classification Dashboard
+=========================================================================
 """
 
-import streamlit as st
-import pandas as pd
-import numpy as np
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import seaborn as sns
-import joblib
+from __future__ import annotations
+
 import os
-import gc
-import xgboost as xgb
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
+import joblib
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import streamlit as st
+import xgboost as xgb  # noqa: F401 — required when loading serialized XGBoost models
 
 from sklearn.metrics import (
-    accuracy_score, f1_score, precision_score, recall_score,
-    classification_report, roc_auc_score
+    accuracy_score,
+    auc,
+    classification_report,
+    confusion_matrix,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+    roc_curve,
 )
 from sklearn.preprocessing import label_binarize
 
 
-# ============================================================
-# XGBOOST CLASS ORDER
-# ============================================================
-# XGBClassifier is trained with integer target IDs (0..6).
-# The exported xgb_y_pred.pkl uses the original string labels.
-# Keep this order identical to LabelEncoder.classes_ in XGBoost.ipynb.
-XGB_CLASS_NAMES = np.array([
+# =============================================================================
+# PAGE CONFIGURATION
+# =============================================================================
+
+st.set_page_config(
+    page_title="Obesity Risk Analytics & Classification",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+
+# =============================================================================
+# PROJECT CONSTANTS
+# =============================================================================
+
+TARGET = "NObeyesdad"
+
+NUMERICAL_COLUMNS = [
+    "Age",
+    "Height",
+    "Weight",
+    "FCVC",
+    "NCP",
+    "CH2O",
+    "FAF",
+    "TUE",
+]
+
+CATEGORICAL_COLUMNS = [
+    "Gender",
+    "family_history_with_overweight",
+    "FAVC",
+    "CAEC",
+    "SMOKE",
+    "SCC",
+    "CALC",
+    "MTRANS",
+]
+
+EXPECTED_CATEGORIES = {
+    "Gender": ["Female", "Male"],
+    "family_history_with_overweight": ["no", "yes"],
+    "FAVC": ["no", "yes"],
+    "CAEC": ["Always", "Frequently", "Sometimes", "no"],
+    "SMOKE": ["no", "yes"],
+    "SCC": ["no", "yes"],
+    "CALC": ["Always", "Frequently", "Sometimes", "no"],
+    "MTRANS": [
+        "Automobile",
+        "Bike",
+        "Motorbike",
+        "Public_Transportation",
+        "Walking",
+    ],
+}
+
+# Natural obesity progression used only for presentation/analysis ordering.
+# This does NOT change any model's internal class/probability order.
+OBESITY_ORDER = [
     "Insufficient_Weight",
     "Normal_Weight",
+    "Overweight_Level_I",
+    "Overweight_Level_II",
     "Obesity_Type_I",
     "Obesity_Type_II",
     "Obesity_Type_III",
-    "Overweight_Level_I",
-    "Overweight_Level_II"
-], dtype=str)
+]
 
+DISPLAY_LABELS = {
+    "Insufficient_Weight": "Insufficient Weight",
+    "Normal_Weight": "Normal Weight",
+    "Overweight_Level_I": "Overweight Level I",
+    "Overweight_Level_II": "Overweight Level II",
+    "Obesity_Type_I": "Obesity Type I",
+    "Obesity_Type_II": "Obesity Type II",
+    "Obesity_Type_III": "Obesity Type III",
+}
 
-# ============================================================
-# PAGE CONFIG
-# ============================================================
-
-st.set_page_config(
-    page_title="Obesity Level Classification Dashboard",
-    layout="wide"
+# XGBoost was trained with integer IDs created by LabelEncoder.
+# Keep this EXACTLY aligned with LabelEncoder.classes_ in the executed notebook.
+XGB_CLASS_NAMES = np.array(
+    [
+        "Insufficient_Weight",
+        "Normal_Weight",
+        "Obesity_Type_I",
+        "Obesity_Type_II",
+        "Obesity_Type_III",
+        "Overweight_Level_I",
+        "Overweight_Level_II",
+    ],
+    dtype=str,
 )
 
-st.title("Obesity Level Classification — Model Comparison")
-st.caption(
-    "CRISP-DM Project | Estimation of Obesity Levels Based on "
-    "Eating Habits and Physical Condition"
-)
+# Consistent ordinal palette: light = lower category, dark = higher category.
+OBESITY_COLORS = {
+    "Insufficient_Weight": "#D9F0F0",
+    "Normal_Weight": "#B8E0DF",
+    "Overweight_Level_I": "#90C9C7",
+    "Overweight_Level_II": "#62AAA9",
+    "Obesity_Type_I": "#3A8688",
+    "Obesity_Type_II": "#25666D",
+    "Obesity_Type_III": "#164A57",
+}
 
+MODEL_COLORS = {
+    "Logistic Regression": "#6B7F93",
+    "K-Nearest Neighbours (KNN)": "#5C9EAD",
+    "Random Forest": "#3A7D77",
+    "XGBoost": "#1F5F75",
+}
 
-# ============================================================
-# MODEL REGISTRY
-# ============================================================
-# Add each new model here once its files are available.
-#
-# For models that are not ready yet, keep:
-#     "available": False
-#
-# Once the model is ready, change it to:
-#     "available": True
-#
-# and provide the required file paths.
-# ============================================================
+NUMERIC_UNITS = {
+    "Age": "years",
+    "Height": "m",
+    "Weight": "kg",
+    "FCVC": "vegetable-consumption scale (1–3)",
+    "NCP": "main meals (1–4)",
+    "CH2O": "water-consumption scale (1–3)",
+    "FAF": "physical-activity frequency scale (0–3)",
+    "TUE": "technology-use scale (0–2)",
+}
+
+# Dataset context stated in the written report/UCI description.
+DATASET_CONTEXT = {
+    "countries": "Mexico, Peru and Colombia",
+    "synthetic_share": 0.77,
+    "collected_share": 0.23,
+}
 
 MODEL_REGISTRY = {
-
     "Logistic Regression": {
-        "available": True,
-
         "model_path": "models/logistic_regression_model.pkl",
-        "X_test_path": "data/X_test_encoded.pkl",
-        "y_test_path": "data/y_test_flat.pkl",
         "y_pred_path": "data/lr_y_pred.pkl",
         "y_proba_path": "data/lr_y_pred_proba.pkl",
-
-        "confusion_matrix_image": "images/lr_confusion_matrix.png",
-        "feature_importance_image": "images/lr_feature_importance.png",
-        "roc_curve_image": "images/lr_roc_curves.png",
-        "feature_importance_data":
-        "data/lr_feature_importance.csv",
-        
+        "feature_data_candidates": [
+            "data/lr_feature_importance.csv",
+            "lr_feature_importance.csv",
+        ],
     },
-    
+    "K-Nearest Neighbours (KNN)": {
+        "model_path": "models/knn_model.pkl",
+        "y_pred_path": "data/knn_y_pred.pkl",
+        "y_proba_path": "data/knn_y_pred_proba.pkl",
+        "feature_data_candidates": [
+            "data/knn_feature_importance.csv",
+            "knn_feature_importance.csv",
+        ],
+    },
     "Random Forest": {
-        "available": True,
-
         "model_path": "models/random_forest_model.pkl",
-        "X_test_path": "data/X_test_encoded.pkl",
-        "y_test_path": "data/y_test_flat.pkl",
         "y_pred_path": "data/rf_y_pred.pkl",
         "y_proba_path": "data/rf_y_pred_proba.pkl",
-
-        "confusion_matrix_image":
-            "images/rf_confusion_matrix.png",
-
-        "feature_importance_image":
-            "images/rf_feature_importance.png",
-
-        "roc_curve_image":
-            "images/rf_roc_curves.png",
+        "feature_data_candidates": [
+            "data/rf_feature_importance.csv",
+            "rf_feature_importance.csv",
+        ],
     },
-
-"K-Nearest Neighbours (KNN)": {
-    "available": True,
-    "model_path": "models/knn_model.pkl",
-    "X_test_path": "data/X_test_encoded.pkl",
-    "y_test_path": "data/y_test_flat.pkl",
-    "y_pred_path": "data/knn_y_pred.pkl",
-    "y_proba_path": "data/knn_y_pred_proba.pkl",
-    "confusion_matrix_image": "images/knn_confusion_matrix.png",
-    "feature_importance_image": "images/knn_feature_importance.png",
-    "roc_curve_image": "images/knn_roc_curves.png",
-     "feature_importance_data": "data/knn_feature_importance.csv",
-},
-
     "XGBoost": {
-        "available": True,
         "model_path": "models/xgboost_model.pkl",
-        "X_test_path": "data/X_test_encoded.pkl",
-        "y_test_path": "data/y_test_flat.pkl",
         "y_pred_path": "data/xgb_y_pred.pkl",
         "y_proba_path": "data/xgb_y_pred_proba.pkl",
-        "confusion_matrix_image": "images/xgb_confusion_matrix.png",
-        "feature_importance_image": "images/xgb_feature_importance.png",
-        "roc_curve_image": "images/xgb_roc_curves.png",
+        "feature_data_candidates": [
+            "data/xgb_feature_importance.csv",
+            "xgb_feature_importance.csv",
+        ],
     },
 }
 
-
-# ============================================================
-# LOAD MODEL ARTIFACTS
-# ============================================================
-
-@st.cache_resource
-def load_artifacts(config):
-
-    model = joblib.load(config["model_path"])
-    X_test = joblib.load(config["X_test_path"])
-    y_test = joblib.load(config["y_test_path"])
-    y_pred = joblib.load(config["y_pred_path"])
-    y_proba = joblib.load(config["y_proba_path"])
-
-    return model, X_test, y_test, y_pred, y_proba
-
-
-# ============================================================
-# SIDEBAR
-# ============================================================
-
-st.sidebar.header("Dashboard Controls")
-
-
-# ============================================================
-# MODEL SELECTION
-# ============================================================
-
-st.sidebar.subheader("Model Selection")
-
-selected_model_name = st.sidebar.selectbox(
-    "Select Model",
-    list(MODEL_REGISTRY.keys()),
-    key="selected_model"
-)
-
-selected_config = MODEL_REGISTRY[selected_model_name]
-
-
-# ============================================================
-# PREDICTION INPUTS
-# ============================================================
-
-st.sidebar.markdown("---")
-st.sidebar.subheader("Prediction Inputs")
-
-st.sidebar.caption(
-    "Enter an individual's information. "
-    "These inputs remain unchanged when switching models."
-)
-
-
-# ------------------------------------------------------------
-# DEMOGRAPHIC & PHYSICAL INFORMATION
-# ------------------------------------------------------------
-
-st.sidebar.markdown("**Demographic & Physical Information**")
-
-gender = st.sidebar.selectbox(
-    "Gender",
-    ["Female", "Male"],
-    key="input_gender"
-)
-
-age = st.sidebar.number_input(
-    "Age (years)",
-    min_value=14,
-    max_value=61,
-    value=25,
-    key="input_age"
-)
-
-height = st.sidebar.number_input(
-    "Height (m)",
-    min_value=1.45,
-    max_value=1.98,
-    value=1.70,
-    step=0.01,
-    key="input_height"
-)
-
-weight = st.sidebar.number_input(
-    "Weight (kg)",
-    min_value=39.0,
-    max_value=173.0,
-    value=70.0,
-    step=0.5,
-    key="input_weight"
-)
-
-family_history = st.sidebar.selectbox(
-    "Family history of overweight?",
-    ["yes", "no"],
-    key="input_family_history"
-)
-
-
-# ------------------------------------------------------------
-# BMI
-# ------------------------------------------------------------
-
-bmi = weight / (height ** 2)
-
-st.sidebar.metric(
-    "Calculated BMI",
-    f"{bmi:.2f}"
-)
-
-st.sidebar.caption(
-    "BMI is shown for reference only and is not used as an input "
-    "feature by the trained models."
-)
-
-
-# ------------------------------------------------------------
-# EATING HABITS
-# ------------------------------------------------------------
-
-st.sidebar.markdown("**Eating Habits**")
-
-favc = st.sidebar.selectbox(
-    "Frequent high-calorie food (FAVC)?",
-    ["yes", "no"],
-    key="input_favc"
-)
-
-fcvc = st.sidebar.slider(
-    "Vegetable consumption frequency (FCVC)",
-    1.0,
-    3.0,
-    2.0,
-    step=0.1,
-    key="input_fcvc"
-)
-
-ncp = st.sidebar.slider(
-    "Number of main meals (NCP)",
-    1.0,
-    4.0,
-    3.0,
-    step=0.1,
-    key="input_ncp"
-)
-
-caec = st.sidebar.selectbox(
-    "Eating between meals (CAEC)",
-    ["no", "Sometimes", "Frequently", "Always"],
-    key="input_caec"
-)
-
-ch2o = st.sidebar.slider(
-    "Daily water consumption (CH2O)",
-    1.0,
-    3.0,
-    2.0,
-    step=0.1,
-    key="input_ch2o"
-)
-
-scc = st.sidebar.selectbox(
-    "Monitors calorie consumption (SCC)?",
-    ["no", "yes"],
-    key="input_scc"
-)
-
-calc = st.sidebar.selectbox(
-    "Alcohol consumption (CALC)",
-    ["no", "Sometimes", "Frequently", "Always"],
-    key="input_calc"
-)
-
-
-# ------------------------------------------------------------
-# LIFESTYLE
-# ------------------------------------------------------------
-
-st.sidebar.markdown("**Lifestyle**")
-
-smoke = st.sidebar.selectbox(
-    "Smoker?",
-    ["no", "yes"],
-    key="input_smoke"
-)
-
-faf = st.sidebar.slider(
-    "Physical activity frequency (FAF)",
-    0.0,
-    3.0,
-    1.0,
-    step=0.1,
-    key="input_faf"
-)
-
-tue = st.sidebar.slider(
-    "Time using technology devices (TUE)",
-    0.0,
-    2.0,
-    1.0,
-    step=0.1,
-    key="input_tue"
-)
-
-mtrans = st.sidebar.selectbox(
-    "Transportation used (MTRANS)",
-    [
-        "Automobile",
-        "Motorbike",
-        "Bike",
-        "Public_Transportation",
-        "Walking"
-    ],
-    key="input_mtrans"
-)
-
-
-# ============================================================
-# CHECK WHETHER MODEL IS AVAILABLE
-# ============================================================
-
-if not selected_config.get("available", False):
-
-    st.info(
-        f"**{selected_model_name}** is currently unavailable. "
-        "Its trained model and evaluation artifacts have not been added yet."
-    )
-    st.stop()
-
-
-
-
-# ============================================================
-# LOAD SELECTED MODEL
-# ============================================================
-
-model, X_test, y_test, y_pred, y_proba = load_artifacts(
-    selected_config
-)
-
-# Keep evaluation labels consistent across every model.
-y_test = np.asarray(y_test).ravel().astype(str)
-y_pred = np.asarray(y_pred).ravel().astype(str)
-
-# A plain XGBClassifier stores integer classes (0..6), while the shared
-# y_test and exported XGBoost predictions are obesity-level strings.
-# Use the fixed LabelEncoder class order only for XGBoost.
-if selected_model_name == "XGBoost":
-    class_names = XGB_CLASS_NAMES
-else:
-    class_names = np.asarray(model.classes_).astype(str)
-
-y_test_binarized = label_binarize(
-    y_test,
-    classes=class_names
-)
-
-
-# ============================================================
-# MODEL PERFORMANCE METRICS
-# ============================================================
-
-accuracy = accuracy_score(
-    y_test,
-    y_pred
-)
-
-f1_weighted = f1_score(
-    y_test,
-    y_pred,
-    average="weighted",
-    zero_division=0
-)
-
-precision_w = precision_score(
-    y_test,
-    y_pred,
-    average="weighted",
-    zero_division=0
-)
-
-recall_w = recall_score(
-    y_test,
-    y_pred,
-    average="weighted",
-    zero_division=0
-)
-
-roc_auc_weighted = roc_auc_score(
-    y_test_binarized,
-    np.asarray(y_proba),
-    average="weighted",
-    multi_class="ovr"
-)
-
-
-# ============================================================
-# PREDICTION
-# ============================================================
-
-input_dict = {
-
-    "Gender": gender,
-    "Age": age,
-    "Height": height,
-    "Weight": weight,
-
-    "family_history_with_overweight":
-        family_history,
-
-    "FAVC": favc,
-    "FCVC": fcvc,
-    "NCP": ncp,
-    "CAEC": caec,
-    "SMOKE": smoke,
-    "CH2O": ch2o,
-    "SCC": scc,
-    "FAF": faf,
-    "TUE": tue,
-    "CALC": calc,
-    "MTRANS": mtrans,
+X_TEST_PATH = "data/X_test_encoded.pkl"
+Y_TEST_PATH = "data/y_test_flat.pkl"
+CV_RESULTS_CSV = "data/cv_results.csv"  # optional future export
+
+# Executed DS_4Models notebook reference values. These values are NOT used to
+# overwrite held-out test metrics when saved prediction artifacts are present.
+# They are used for (1) consistency checks and (2) CV display because the
+# current repository plan does not store per-fold CV results as artifacts.
+NOTEBOOK_TEST_RESULTS = {
+    "Logistic Regression": {
+        "Accuracy": 0.9011,
+        "Precision": 0.8998,
+        "Recall": 0.9011,
+        "Weighted F1": 0.9002,
+        "Macro F1": 0.8979,
+        "ROC-AUC": 0.9865,
+        "Errors": 62,
+    },
+    "K-Nearest Neighbours (KNN)": {
+        "Accuracy": 0.8820,
+        "Precision": 0.8817,
+        "Recall": 0.8820,
+        "Weighted F1": 0.8787,
+        "Macro F1": 0.8752,
+        "ROC-AUC": 0.9706,
+        "Errors": 74,
+    },
+    "Random Forest": {
+        "Accuracy": 0.9394,
+        "Precision": 0.9434,
+        "Recall": 0.9394,
+        "Weighted F1": 0.9402,
+        "Macro F1": 0.9379,
+        "ROC-AUC": 0.9938,
+        "Errors": 38,
+    },
+    "XGBoost": {
+        "Accuracy": 0.9649,
+        "Precision": 0.9652,
+        "Recall": 0.9649,
+        "Weighted F1": 0.9650,
+        "Macro F1": 0.9640,
+        "ROC-AUC": 0.9985,
+        "Errors": 22,
+    },
 }
 
-
-# Build the encoded row manually — pd.get_dummies is unreliable on a
-# single row because drop_first drops whatever category is present,
-# regardless of which category it actually is.
-#
-# IMPORTANT FOR XGBOOST:
-# XGBoost validates feature NAMES as well as the number/order of features.
-# Therefore, when XGBoost is selected, build the input row from the exact
-# feature names stored inside the fitted booster instead of blindly using
-# the shared X_test columns.
-if selected_model_name == "XGBoost":
-    prediction_columns = model.get_booster().feature_names
-
-    if not prediction_columns:
-        prediction_columns = X_test.columns.tolist()
-else:
-    prediction_columns = X_test.columns.tolist()
-
-input_aligned = pd.DataFrame(
-    0.0,
-    index=[0],
-    columns=prediction_columns
-)
-
-# Numeric columns — copy directly
-numeric_cols = ["Age", "Height", "Weight", "FCVC", "NCP", "CH2O", "FAF", "TUE"]
-for col in numeric_cols:
-    if col in input_aligned.columns:
-        input_aligned.at[0, col] = input_dict[col]
-
-# Categorical columns — set the matching dummy column to 1.
-# If the dummy column doesn't exist in X_test.columns, that means this
-# value IS the training data's reference category, so leaving it at 0 is correct.
-categorical_map = {
-    "Gender": gender,
-    "family_history_with_overweight": family_history,
-    "FAVC": favc,
-    "CAEC": caec,
-    "SMOKE": smoke,
-    "SCC": scc,
-    "CALC": calc,
-    "MTRANS": mtrans,
-}
-
-for col, value in categorical_map.items():
-    dummy_col_name = f"{col}_{value}"
-    if dummy_col_name in input_aligned.columns:
-        input_aligned.at[0, dummy_col_name] = 1.0
-
-raw_prediction = model.predict(
-    input_aligned
-)[0]
-
-prediction_proba = model.predict_proba(
-    input_aligned
-)[0]
-
-# Convert XGBoost's integer class ID back to the original obesity label.
-if selected_model_name == "XGBoost":
-    prediction = XGB_CLASS_NAMES[int(raw_prediction)]
-    probability_class_names = XGB_CLASS_NAMES
-else:
-    prediction = str(raw_prediction)
-    probability_class_names = np.asarray(model.classes_).astype(str)
-
-prediction_probability = prediction_proba.max()
-
-
-proba_df = pd.DataFrame({
-    "Class": probability_class_names,
-    "Probability": prediction_proba
-}).sort_values(
-    "Probability",
-    ascending=False
-)
-
-
-# ============================================================
-# MAIN AREA — PERFORMANCE OVERVIEW
-# ============================================================
-
-st.header(
-    f"{selected_model_name} — Performance Overview"
-)
-
-st.caption(
-    "Model performance and prediction results based on "
-    "the currently selected model."
-)
-
-
-# ============================================================
-# PERFORMANCE METRICS
-# ============================================================
-
-col1, col2, col3, col4, col5 = st.columns(5)
-
-col1.metric(
-    "Accuracy",
-    f"{accuracy:.2%}"
-)
-
-col2.metric(
-    "F1 (Weighted)",
-    f"{f1_weighted:.4f}"
-)
-
-col3.metric(
-    "Precision (Weighted)",
-    f"{precision_w:.4f}"
-)
-
-col4.metric(
-    "Recall (Weighted)",
-    f"{recall_w:.4f}"
-)
-
-col5.metric(
-    "ROC-AUC (Weighted, OvR)",
-    f"{roc_auc_weighted:.4f}"
-)
-
-
-st.markdown("---")
-
-
-# ============================================================
-# PREDICTION RESULT
-# ============================================================
-
-st.subheader("Prediction Result")
-
-prediction_col1, prediction_col2 = st.columns(
-    [1, 2]
-)
-
-
-# ------------------------------------------------------------
-# LEFT — PREDICTED CLASS
-# ------------------------------------------------------------
-
-with prediction_col1:
-
-    st.markdown("### Predicted Obesity Level")
-
-    st.success(
-        f"## {prediction}"
-    )
-
-    st.metric(
-        "Prediction Probability",
-        f"{prediction_probability:.2%}"
-    )
-
-    st.caption(
-        f"Predicted using the {selected_model_name} model."
-    )
-
-
-# ------------------------------------------------------------
-# RIGHT — PROBABILITY DISTRIBUTION
-# ------------------------------------------------------------
-
-with prediction_col2:
-
-    st.markdown("### Class Probabilities")
-
-    fig, ax = plt.subplots(
-        figsize=(8, 4)
-    )
-
-    ax.barh(
-        proba_df["Class"][::-1],
-        proba_df["Probability"][::-1],
-        color="steelblue"
-    )
-
-    ax.set_xlabel(
-        "Predicted Probability"
-    )
-
-    ax.set_xlim(
-        0,
-        1
-    )
-
-    plt.tight_layout()
-
-    st.pyplot(fig)
-
-    plt.close(fig)
-    gc.collect()
-
-
-# ============================================================
-# INPUT SUMMARY
-# ============================================================
-
-st.markdown("---")
-
-st.subheader("Prediction Input Summary")
-
-input_summary_col1, input_summary_col2, input_summary_col3 = (
-    st.columns(3)
-)
-
-
-with input_summary_col1:
-
-    st.metric(
-        "Age",
-        f"{age} years"
-    )
-
-    st.metric(
-        "Gender",
-        gender
-    )
-
-    st.metric(
-        "Height",
-        f"{height:.2f} m"
-    )
-
-
-with input_summary_col2:
-
-    st.metric(
-        "Weight",
-        f"{weight:.1f} kg"
-    )
-
-    st.metric(
-        "BMI",
-        f"{bmi:.2f}"
-    )
-
-    st.metric(
-        "Family History",
-        family_history
-    )
-
-
-with input_summary_col3:
-
-    st.metric(
-        "Physical Activity",
-        f"{faf:.1f}"
-    )
-
-    st.metric(
-        "Water Consumption",
-        f"{ch2o:.1f}"
-    )
-
-    st.metric(
-        "Technology Usage",
-        f"{tue:.1f}"
-    )
-
-
-st.markdown("---")
-
-
-# ============================================================
-# RESULTS NAVIGATION
-# ============================================================
-
-
-section = st.radio(
-    "View Results",
-    [
-        "Confusion Matrix",
-        "Classification Report",
-        "Feature Importance",
-        "ROC Curves"
-    ],
-    horizontal=True,
-    label_visibility="collapsed"
-)
-
-st.markdown("")
-
-
-# ============================================================
-# CONFUSION MATRIX
-# ============================================================
-
-if section == "Confusion Matrix":
-
-    st.subheader("Confusion Matrix")
-
-    st.caption(
-        f"Confusion matrix for the {selected_model_name} model."
-    )
-
-    st.image(
-        selected_config["confusion_matrix_image"],
-        width="stretch"
-    )
-
-
-# ============================================================
-# CLASSIFICATION REPORT
-# ============================================================
-
-elif section == "Classification Report":
-
-    st.subheader("Classification Report")
-
-    st.caption(
-        "Detailed precision, recall, F1-score and support "
-        "for each obesity category."
-    )
-
-    report_dict = classification_report(
-        y_test,
-        y_pred,
-        output_dict=True
-    )
-
-    report_df = (
-        pd.DataFrame(report_dict)
-        .transpose()
-        .round(4)
-    )
-
-    st.dataframe(
-        report_df,
-        width="stretch"
-    )
-
-
-# ============================================================
-# FEATURE IMPORTANCE
-# ============================================================
-
-elif section == "Feature Importance":
-
-    st.subheader("Feature Importance")
-    st.caption(f"Feature importance generated for the {selected_model_name} model.")
-
-    st.image(selected_config["feature_importance_image"], width="stretch")
-
-    if hasattr(model, "feature_importances_"):
-        if selected_model_name == "XGBoost":
-            feature_names = model.get_booster().feature_names
-            if not feature_names:
-                feature_names = X_test.columns.tolist()
-        else:
-            feature_names = X_test.columns.tolist()
-
-        importances = pd.Series(
-            model.feature_importances_,
-            index=feature_names
-        ).sort_values(ascending=False)
-
-        top15 = importances.head(15)
-        feature_df = top15.reset_index().rename(
-            columns={"index": "Feature", 0: "Importance"}
-        )
-        st.dataframe(feature_df, width="stretch", hide_index=True)
-
-    elif "feature_importance_data" in selected_config:
-        feature_df = pd.read_csv(selected_config["feature_importance_data"])
-        st.dataframe(feature_df, width="stretch", hide_index=True)
-
-    else:
-        st.info("Feature importance is not available for this model.")
-
-# ============================================================
-# ROC CURVES
-# ============================================================
-
-elif section == "ROC Curves":
-
-    st.subheader("ROC Curves")
-
-    st.caption(
-        f"One-vs-Rest ROC curves for the "
-        f"{selected_model_name} model."
-    )
-
-    st.image(
-        selected_config["roc_curve_image"],
-        width="stretch"
-    )
-
-
-# ============================================================
-# MODEL COMPARISON — HIGH-MARK ANALYTICS DASHBOARD
-# ============================================================
-
-st.markdown("---")
-st.header("Model Comparison")
-st.caption(
-    "Analytical comparison of Logistic Regression, KNN, Random Forest and "
-    "XGBoost using the same saved held-out test set."
-)
-
-
-# ------------------------------------------------------------
-# Notebook cross-validation results
-# ------------------------------------------------------------
-# These values come directly from the project's existing executed notebook.
-# This app-only version intentionally keeps them hard-coded so no other project
-# files need to be changed. Held-out test metrics are calculated from the saved
-# prediction/probability artifacts currently used by the project.
-CV_RESULTS = {
+# One-standard-deviation values. Random Forest's notebook prints +/- 2*SD,
+# so the notebook's displayed 0.0416 / 0.0421 are converted here to ~1 SD.
+NOTEBOOK_CV_RESULTS = {
     "Logistic Regression": {
         "CV Accuracy": 0.8568,
         "CV Accuracy Std": 0.0214,
         "CV F1": 0.8542,
         "CV F1 Std": 0.0227,
     },
-    "Random Forest": {
-        "CV Accuracy": 0.9253,
-        "CV Accuracy Std": 0.0416 / 2,
-        "CV F1": 0.9264,
-        "CV F1 Std": 0.0421 / 2,
-    },
     "K-Nearest Neighbours (KNN)": {
         "CV Accuracy": 0.8822,
         "CV Accuracy Std": 0.0148,
         "CV F1": 0.8779,
         "CV F1 Std": 0.0165,
+    },
+    "Random Forest": {
+        "CV Accuracy": 0.9253,
+        "CV Accuracy Std": 0.0208,
+        "CV F1": 0.9264,
+        "CV F1 Std": 0.0211,
     },
     "XGBoost": {
         "CV Accuracy": 0.9651,
@@ -890,891 +276,2519 @@ CV_RESULTS = {
     },
 }
 
+NOTEBOOK_TRAIN_ACCURACY = {
+    "Logistic Regression": 0.8966,
+    "K-Nearest Neighbours (KNN)": 1.0000,
+    "Random Forest": 0.9959,
+    "XGBoost": 1.0000,
+}
 
-# ------------------------------------------------------------
-# Load all model artifacts once
-# ------------------------------------------------------------
-
-@st.cache_data(show_spinner=False)
-def build_model_comparison():
-    rows = []
-    artifacts = {}
-
-    for model_name, config in MODEL_REGISTRY.items():
-        if not config.get("available", False):
-            continue
-
-        try:
-            loaded_model, loaded_X_test, loaded_y_test, loaded_y_pred, loaded_y_proba = (
-                load_artifacts(config)
-            )
-
-            y_true = np.asarray(loaded_y_test).ravel().astype(str)
-            y_pred = np.asarray(loaded_y_pred).ravel().astype(str)
-
-            # Ensure probability output is numeric and 2-D.
-            y_proba = np.asarray(loaded_y_proba)
-
-            if model_name == "XGBoost":
-                classes = XGB_CLASS_NAMES
-            else:
-                classes = np.asarray(loaded_model.classes_).astype(str)
-
-            y_true_bin = label_binarize(y_true, classes=classes)
-
-            # Some artifacts can contain one extra dimension.
-            if y_proba.ndim > 2:
-                y_proba = np.squeeze(y_proba)
-
-            # Validate the saved evaluation artifacts before comparing models.
-            if y_proba.ndim != 2:
-                raise ValueError("predict_proba artifact must be 2-D")
-            if len(y_true) != len(y_pred):
-                raise ValueError("prediction length does not match y_test")
-            if y_proba.shape[0] != len(y_true):
-                raise ValueError("probability row count does not match y_test")
-            if y_proba.shape[1] != len(classes):
-                raise ValueError("probability column count does not match class count")
-            if not np.allclose(y_proba.sum(axis=1), 1.0, atol=1e-4):
-                raise ValueError("class probabilities do not sum to 1")
-
-            accuracy = accuracy_score(y_true, y_pred)
-            precision = precision_score(
-                y_true, y_pred, average="weighted", zero_division=0
-            )
-            recall = recall_score(
-                y_true, y_pred, average="weighted", zero_division=0
-            )
-            weighted_f1 = f1_score(
-                y_true, y_pred, average="weighted", zero_division=0
-            )
-            macro_f1 = f1_score(
-                y_true, y_pred, average="macro", zero_division=0
-            )
-
-            try:
-                roc_auc = roc_auc_score(
-                    y_true_bin,
-                    y_proba,
-                    average="weighted",
-                    multi_class="ovr",
-                )
-            except ValueError:
-                roc_auc = np.nan
-
-            errors = int(np.sum(y_true != y_pred))
-            error_rate = errors / len(y_true)
-
-            cv = CV_RESULTS.get(model_name, {})
-
-            rows.append({
-                "Model": model_name,
-                "Accuracy": accuracy,
-                "Precision": precision,
-                "Recall": recall,
-                "F1 Score": weighted_f1,
-                "Macro F1": macro_f1,
-                "ROC-AUC": roc_auc,
-                "Errors": errors,
-                "Error Rate": error_rate,
-                "Test Size": len(y_true),
-                "CV Accuracy": cv.get("CV Accuracy", np.nan),
-                "CV Accuracy Std": cv.get("CV Accuracy Std", np.nan),
-                "CV F1": cv.get("CV F1", np.nan),
-                "CV F1 Std": cv.get("CV F1 Std", np.nan),
-            })
-
-            artifacts[model_name] = {
-                "model": loaded_model,
-                "y_true": y_true,
-                "y_pred": y_pred,
-                "y_proba": y_proba,
-                "classes": classes,
-            }
-
-        except Exception as exc:
-            st.warning(
-                f"Could not load comparison results for {model_name}: {exc}"
-            )
-
-    return pd.DataFrame(rows), artifacts
+MODEL_INFO = {
+    "Logistic Regression": {
+        "role": "Baseline model",
+        "family": "Linear probabilistic classifier",
+        "configuration": (
+            "max_iter=2000, random_state=42. The deployment Pipeline applies "
+            "StandardScaler to the eight numerical predictors internally."
+        ),
+        "strength": "Highly interpretable, fast, and a strong reference baseline.",
+        "limitation": "Linear decision boundaries can miss nonlinear interactions.",
+        "interpretability": "High",
+        "operational_complexity": "Low",
+    },
+    "K-Nearest Neighbours (KNN)": {
+        "role": "Distance-based nonlinear model",
+        "family": "Instance-based classifier",
+        "configuration": (
+            "k=3, Manhattan distance, distance weighting. The deployment Pipeline "
+            "applies StandardScaler internally."
+        ),
+        "strength": "Captures local neighbourhood structure without a linear-boundary assumption.",
+        "limitation": "Distance-sensitive and prediction cost grows with training-set size.",
+        "interpretability": "Medium–Low",
+        "operational_complexity": "Medium",
+    },
+    "Random Forest": {
+        "role": "Nonlinear ensemble model",
+        "family": "Bagged decision-tree ensemble",
+        "configuration": (
+            "500 trees, max_depth=12, min_samples_split=5, min_samples_leaf=2, "
+            "class_weight='balanced'. Uses encoded unscaled predictors."
+        ),
+        "strength": "Captures nonlinear relationships/interactions and provides tree importance.",
+        "limitation": "Less directly interpretable than the baseline and shows a larger train–test gap.",
+        "interpretability": "Medium",
+        "operational_complexity": "Medium",
+    },
+    "XGBoost": {
+        "role": "Boosted-tree final candidate",
+        "family": "Gradient-boosted decision trees",
+        "configuration": (
+            "learning_rate=0.1, max_depth=5, subsample=1.0. Uses the exact 23-feature "
+            "encoded schema and integer target IDs decoded through XGB_CLASS_NAMES."
+        ),
+        "strength": "Strong predictive performance and captures complex nonlinear interactions.",
+        "limitation": "Lower intrinsic interpretability and greater tuning/deployment complexity.",
+        "interpretability": "Medium–Low",
+        "operational_complexity": "Medium–High",
+    },
+}
 
 
-comparison_df, comparison_artifacts = build_model_comparison()
+# =============================================================================
+# DESIGN SYSTEM
+# =============================================================================
 
-if comparison_df.empty:
-    st.error("No model evaluation artifacts are available.")
-else:
-
-    # --------------------------------------------------------
-    # Model ranking
-    # --------------------------------------------------------
-    # App-only approach: rank primarily by held-out weighted F1.
-    # Accuracy and weighted OvR ROC-AUC act as tie-breakers/supporting metrics.
-    comparison_df = (
-        comparison_df
-        .sort_values(
-            by=["F1 Score", "Accuracy", "ROC-AUC"],
-            ascending=[False, False, False],
-            na_position="last",
-        )
-        .reset_index(drop=True)
-    )
-
-    comparison_df["Rank"] = np.arange(1, len(comparison_df) + 1)
-    winner = comparison_df.iloc[0]
-    shared_test_size = int(comparison_df["Test Size"].iloc[0])
-
-    st.caption(
-        f"All displayed held-out metrics use the same {shared_test_size}-sample "
-        "saved test set. The CV table uses the notebook results already embedded "
-        "in this app and is shown as supporting evidence."
-    )
-
-    # --------------------------------------------------------
-    # CSS
-    # --------------------------------------------------------
+def inject_css() -> None:
     st.markdown(
         """
         <style>
-        .comparison-winner {
-            padding: 24px;
-            border-radius: 16px;
-            border: 1px solid rgba(46, 125, 50, .35);
-            background: rgba(46, 125, 50, .08);
+        :root {
+            --ink: #16303A;
+            --muted: #5D727A;
+            --panel: #FFFFFF;
+            --bg: #F4F8F9;
+            --line: #DDE8EA;
+            --teal: #2B7A78;
+            --teal-dark: #1F5F75;
+            --teal-soft: #E9F4F4;
+            --warning: #9A6700;
+        }
+
+        .stApp { background: var(--bg); }
+        .block-container { max-width: 1450px; padding-top: 1.4rem; padding-bottom: 2rem; }
+
+        h1, h2, h3 { color: var(--ink); letter-spacing: -0.02em; }
+        p, li { color: #31464F; }
+
+        [data-testid="stSidebar"] { background: #F9FCFC; border-right: 1px solid var(--line); }
+        [data-testid="stSidebar"] * { font-size: 0.96rem; }
+
+        .hero {
+            padding: 28px 30px;
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            background: linear-gradient(135deg, #FFFFFF 0%, #F0F8F8 100%);
             margin-bottom: 18px;
         }
+        .hero h1 { margin: 0 0 8px 0; font-size: 2.05rem; }
+        .hero p { margin: 0; color: var(--muted); font-size: 1.02rem; }
 
-        .comparison-winner h2 {
-            margin: 0 0 6px 0;
-        }
-
-        .comparison-card {
-            padding: 18px;
+        .kpi-card {
+            background: var(--panel);
+            border: 1px solid var(--line);
             border-radius: 14px;
-            border: 1px solid rgba(128,128,128,.25);
-            min-height: 180px;
+            padding: 16px 17px;
+            min-height: 112px;
+            box-shadow: 0 2px 8px rgba(31, 95, 117, 0.04);
+        }
+        .kpi-label { color: var(--muted); font-size: 0.82rem; margin-bottom: 6px; }
+        .kpi-value { color: var(--ink); font-size: 1.58rem; font-weight: 760; line-height: 1.15; }
+        .kpi-note { color: #71858C; font-size: 0.75rem; margin-top: 6px; }
+
+        .insight-box {
+            background: #FFFFFF;
+            border: 1px solid var(--line);
+            border-left: 4px solid var(--teal);
+            border-radius: 10px;
+            padding: 14px 16px;
+            margin: 10px 0 14px 0;
+        }
+        .insight-title { color: var(--ink); font-weight: 700; margin-bottom: 4px; }
+        .insight-body { color: #3B515A; line-height: 1.55; }
+
+        .callout {
+            background: var(--teal-soft);
+            border: 1px solid #CFE3E4;
+            border-radius: 12px;
+            padding: 15px 17px;
+            margin: 10px 0;
         }
 
-        .comparison-card-best {
-            border: 2px solid rgba(46,125,50,.65);
-            background: rgba(46,125,50,.07);
+        .flow-step {
+            background: #FFFFFF;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 14px 16px;
+            margin: 8px 0;
+            display: flex;
+            gap: 14px;
+            align-items: flex-start;
         }
-
-        .small-label {
-            font-size: 12px;
-            opacity: .70;
-        }
-
-        .large-number {
-            font-size: 28px;
+        .flow-num {
+            min-width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #D9EEEE;
+            color: #164A57;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             font-weight: 800;
         }
+        .flow-content b { color: var(--ink); }
+        .flow-content span { color: var(--muted); font-size: .92rem; }
 
-        .analysis-box {
-            padding: 18px;
+        .section-eyebrow {
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: #4E787F;
+            font-size: .75rem;
+            font-weight: 750;
+            margin-bottom: 4px;
+        }
+
+        .source-pill {
+            display: inline-block;
+            padding: 5px 9px;
+            border-radius: 999px;
+            border: 1px solid var(--line);
+            background: #FFFFFF;
+            color: var(--muted);
+            font-size: .75rem;
+            margin-right: 5px;
+        }
+
+        div[data-testid="stMetric"] {
+            background: #FFFFFF;
+            border: 1px solid var(--line);
+            padding: 12px 14px;
             border-radius: 12px;
-            background: rgba(128,128,128,.06);
-            border: 1px solid rgba(128,128,128,.20);
+        }
+
+        .small-note { color: var(--muted); font-size: .83rem; }
+
+        @media (max-width: 900px) {
+            .hero { padding: 22px 20px; }
+            .hero h1 { font-size: 1.7rem; }
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
-    # --------------------------------------------------------
-    # 1. WINNER / MODEL SELECTION
-    # --------------------------------------------------------
+
+inject_css()
+
+
+# =============================================================================
+# GENERAL HELPERS
+# =============================================================================
+
+def first_existing_path(candidates: List[str]) -> Optional[str]:
+    for candidate in candidates:
+        if candidate and Path(candidate).exists():
+            return candidate
+    return None
+
+
+def display_label(class_name: str) -> str:
+    return DISPLAY_LABELS.get(str(class_name), str(class_name).replace("_", " "))
+
+
+def humanize_category(value: str) -> str:
+    return str(value).replace("_", " ")
+
+
+def fmt_pct(value: float, digits: int = 2) -> str:
+    if value is None or pd.isna(value):
+        return "Unavailable"
+    return f"{value:.{digits}%}"
+
+
+def fmt_num(value: float, digits: int = 3) -> str:
+    if value is None or pd.isna(value):
+        return "Unavailable"
+    return f"{value:.{digits}f}"
+
+
+def render_hero(title: str, subtitle: str) -> None:
     st.markdown(
         f"""
-        <div class="comparison-winner">
-            <h2>🏆 Recommended Final Model: {winner["Model"]}</h2>
-            <div>
-                The model is selected primarily by held-out weighted F1-score.
-                Accuracy, weighted One-vs-Rest ROC-AUC, macro F1 and
-                misclassification results are used as supporting evidence.
-            </div>
+        <div class="hero">
+            <h1>{title}</h1>
+            <p>{subtitle}</p>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    winner_cols = st.columns(6)
 
-    winner_metrics = [
-        ("Test Accuracy", winner["Accuracy"], "{:.2%}"),
-        ("Weighted F1", winner["F1 Score"], "{:.4f}"),
-        ("Macro F1", winner["Macro F1"], "{:.4f}"),
-        ("Precision", winner["Precision"], "{:.4f}"),
-        ("ROC-AUC (W)", winner["ROC-AUC"], "{:.4f}"),
-        ("Errors", winner["Errors"], "{:.0f}"),
-    ]
+def render_kpi_grid(
+    items: List[Tuple[str, str, str]],
+    columns_per_row: int = 4,
+) -> None:
+    for start in range(0, len(items), columns_per_row):
+        row = items[start : start + columns_per_row]
+        cols = st.columns(columns_per_row)
+        for col, item in zip(cols, row):
+            label, value, note = item
+            with col:
+                st.markdown(
+                    f"""
+                    <div class="kpi-card">
+                        <div class="kpi-label">{label}</div>
+                        <div class="kpi-value">{value}</div>
+                        <div class="kpi-note">{note}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
 
-    for col, (label, value, fmt) in zip(winner_cols, winner_metrics):
-        with col:
-            st.metric(label, fmt.format(value))
 
-    # --------------------------------------------------------
-    # Four model cards
-    # --------------------------------------------------------
-    st.markdown("### Model Scorecards")
+def render_insight(title: str, body: str) -> None:
+    st.markdown(
+        f"""
+        <div class="insight-box">
+            <div class="insight-title">{title}</div>
+            <div class="insight-body">{body}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    card_cols = st.columns(len(comparison_df))
 
-    for col, (_, row) in zip(card_cols, comparison_df.iterrows()):
-        best_class = (
-            "comparison-card-best"
-            if row["Model"] == winner["Model"]
-            else ""
+def render_source_pills(labels: List[str]) -> None:
+    html = "".join(f'<span class="source-pill">{label}</span>' for label in labels)
+    st.markdown(html, unsafe_allow_html=True)
+
+
+def base_plot_layout(fig: go.Figure, height: int = 470) -> go.Figure:
+    fig.update_layout(
+        height=height,
+        template="plotly_white",
+        margin=dict(l=20, r=20, t=70, b=30),
+        font=dict(family="Arial", size=13, color="#31464F"),
+        title_font=dict(size=18, color="#16303A"),
+        legend_title_text="",
+        hoverlabel=dict(font_size=12),
+    )
+    fig.update_xaxes(showgrid=True, gridcolor="#E8EFF0", zeroline=False)
+    fig.update_yaxes(showgrid=False, zeroline=False)
+    return fig
+
+
+# =============================================================================
+# DATA LOADING / PREPARATION FOR DASHBOARD ANALYTICS
+# =============================================================================
+
+@st.cache_data(show_spinner=False)
+def load_dataset() -> Tuple[pd.DataFrame, pd.DataFrame, str]:
+    path = first_existing_path([
+        "ObesityDataSet.csv",
+        "data/ObesityDataSet.csv",
+    ])
+    if path is None:
+        raise FileNotFoundError(
+            "ObesityDataSet.csv was not found in the repository root or data/ folder."
         )
 
-        with col:
+    raw = pd.read_csv(path)
+    clean = raw.drop_duplicates().copy()
+
+    # EDA-only derived variables. They are NOT fed into the trained models.
+    clean["BMI"] = clean["Weight"] / (clean["Height"] ** 2)
+    clean["AgeGroup"] = pd.cut(
+        clean["Age"],
+        bins=[-np.inf, 19, 30, 45, np.inf],
+        labels=[
+            "Teenager (≤19)",
+            "Young Adult (20–30)",
+            "Adult (31–45)",
+            "Senior (46+)",
+        ],
+        include_lowest=True,
+    )
+    return raw, clean, path
+
+
+@st.cache_data(show_spinner=False)
+def load_joblib_data(path: str):
+    return joblib.load(path)
+
+
+@st.cache_resource(show_spinner=False)
+def load_model(path: str):
+    return joblib.load(path)
+
+
+def get_data() -> Tuple[Optional[pd.DataFrame], Optional[pd.DataFrame], Optional[str]]:
+    try:
+        return load_dataset()
+    except Exception as exc:
+        st.error(f"Dataset unavailable: {exc}")
+        return None, None, None
+
+
+# =============================================================================
+# STATISTICAL / ASSOCIATION HELPERS
+# =============================================================================
+
+def eta_squared(values: pd.Series, groups: pd.Series) -> float:
+    frame = pd.DataFrame({"value": values, "group": groups}).dropna()
+    if frame.empty:
+        return np.nan
+    grand_mean = frame["value"].mean()
+    ss_total = ((frame["value"] - grand_mean) ** 2).sum()
+    if ss_total == 0:
+        return 0.0
+    ss_between = 0.0
+    for _, group_df in frame.groupby("group", observed=True):
+        ss_between += len(group_df) * (group_df["value"].mean() - grand_mean) ** 2
+    return float(ss_between / ss_total)
+
+
+def cramers_v(x: pd.Series, y: pd.Series) -> float:
+    table = pd.crosstab(x, y)
+    observed = table.to_numpy(dtype=float)
+    n = observed.sum()
+    if n == 0 or min(observed.shape) < 2:
+        return 0.0
+
+    row_sum = observed.sum(axis=1, keepdims=True)
+    col_sum = observed.sum(axis=0, keepdims=True)
+    expected = row_sum @ col_sum / n
+    valid = expected > 0
+    chi2 = np.sum(((observed - expected) ** 2 / np.where(valid, expected, 1))[valid])
+    phi2 = chi2 / n
+
+    r, k = observed.shape
+    # Bias-corrected Cramér's V.
+    phi2_corr = max(0.0, phi2 - ((k - 1) * (r - 1)) / max(n - 1, 1))
+    r_corr = r - ((r - 1) ** 2) / max(n - 1, 1)
+    k_corr = k - ((k - 1) ** 2) / max(n - 1, 1)
+    denom = min(k_corr - 1, r_corr - 1)
+    if denom <= 0:
+        return 0.0
+    return float(np.sqrt(phi2_corr / denom))
+
+
+def iqr_outlier_summary(df: pd.DataFrame) -> pd.DataFrame:
+    rows = []
+    for col in NUMERICAL_COLUMNS:
+        q1 = df[col].quantile(0.25)
+        q3 = df[col].quantile(0.75)
+        iqr = q3 - q1
+        lower = q1 - 1.5 * iqr
+        upper = q3 + 1.5 * iqr
+        mask = (df[col] < lower) | (df[col] > upper)
+        rows.append(
+            {
+                "Feature": col,
+                "IQR Lower Bound": lower,
+                "IQR Upper Bound": upper,
+                "Flagged Records": int(mask.sum()),
+                "Flagged %": float(mask.mean()),
+                "Observed Min": float(df[col].min()),
+                "Observed Max": float(df[col].max()),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def distribution_shape(skew: float) -> str:
+    if skew >= 1.0:
+        return "strongly right-skewed"
+    if skew >= 0.5:
+        return "moderately right-skewed"
+    if skew > 0.1:
+        return "slightly right-skewed"
+    if skew <= -1.0:
+        return "strongly left-skewed"
+    if skew <= -0.5:
+        return "moderately left-skewed"
+    if skew < -0.1:
+        return "slightly left-skewed"
+    return "approximately symmetric"
+
+
+def numeric_distribution_insight(df: pd.DataFrame, feature: str) -> str:
+    s = df[feature].dropna()
+    skew = float(s.skew())
+    mean = float(s.mean())
+    median = float(s.median())
+    eta = eta_squared(df[feature], df[TARGET])
+    unit = NUMERIC_UNITS[feature]
+    return (
+        f"{feature} is {distribution_shape(skew)} (skewness {skew:.2f}). "
+        f"Its mean is {mean:.2f} and median is {median:.2f} {unit}. "
+        f"As a descriptive class-separation measure, obesity-category grouping accounts for "
+        f"approximately {eta:.1%} of the observed variance in {feature}. This is association, "
+        "not evidence that the feature causes an obesity category."
+    )
+
+
+def class_trend_insight(df: pd.DataFrame, feature: str) -> str:
+    means = df.groupby(TARGET, observed=True)[feature].mean().reindex(OBESITY_ORDER)
+    first = float(means.iloc[0])
+    last = float(means.iloc[-1])
+    diffs = np.diff(means.to_numpy())
+    reversals = int(np.sum(np.sign(diffs[1:]) != np.sign(diffs[:-1]))) if len(diffs) > 1 else 0
+    max_class = means.idxmax()
+    min_class = means.idxmin()
+
+    if last > first:
+        direction = "higher overall"
+    elif last < first:
+        direction = "lower overall"
+    else:
+        direction = "similar overall"
+
+    if reversals == 0:
+        shape_text = "The class means follow a broadly monotonic pattern."
+    else:
+        shape_text = (
+            f"The pattern is not perfectly monotonic; there are {reversals} direction changes "
+            "across neighbouring class means."
+        )
+
+    return (
+        f"The mean {feature} is {direction} in {display_label(OBESITY_ORDER[-1])} "
+        f"({last:.2f}) than in {display_label(OBESITY_ORDER[0])} ({first:.2f}). "
+        f"The highest class mean occurs in {display_label(max_class)} and the lowest in "
+        f"{display_label(min_class)}. {shape_text} Overlap between box distributions means this "
+        "feature should be interpreted as one component of a multivariable classification problem."
+    )
+
+
+def target_association_tables(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    numeric_rows = []
+    for feature in NUMERICAL_COLUMNS:
+        numeric_rows.append(
+            {"Numerical Feature": feature, "Eta-squared": eta_squared(df[feature], df[TARGET])}
+        )
+    numeric_df = pd.DataFrame(numeric_rows).sort_values("Eta-squared", ascending=False)
+
+    cat_rows = []
+    for feature in CATEGORICAL_COLUMNS:
+        cat_rows.append(
+            {"Categorical Feature": feature, "Cramer's V": cramers_v(df[feature], df[TARGET])}
+        )
+    cat_df = pd.DataFrame(cat_rows).sort_values("Cramer's V", ascending=False)
+    return numeric_df, cat_df
+
+
+# =============================================================================
+# DATA VISUALISATIONS
+# =============================================================================
+
+def plot_target_distribution(df: pd.DataFrame) -> go.Figure:
+    counts = df[TARGET].value_counts().reindex(OBESITY_ORDER, fill_value=0)
+    chart_df = pd.DataFrame(
+        {
+            "Class": OBESITY_ORDER,
+            "Label": [display_label(c) for c in OBESITY_ORDER],
+            "Count": counts.values,
+            "Percentage": counts.values / len(df),
+            "Color": [OBESITY_COLORS[c] for c in OBESITY_ORDER],
+        }
+    )
+
+    fig = go.Figure(
+        go.Bar(
+            x=chart_df["Count"],
+            y=chart_df["Label"],
+            orientation="h",
+            marker_color=chart_df["Color"],
+            customdata=np.column_stack([chart_df["Percentage"]]),
+            text=[f"{c:,}  ·  {p:.1%}" for c, p in zip(chart_df["Count"], chart_df["Percentage"])],
+            textposition="outside",
+            hovertemplate="%{y}<br>Count: %{x:,}<br>Share: %{customdata[0]:.2%}<extra></extra>",
+        )
+    )
+    fig.update_layout(
+        title="Obesity Class Distribution — Cleaned Modelling Dataset",
+        xaxis_title="Number of observations",
+        yaxis_title="",
+        showlegend=False,
+    )
+    fig.update_yaxes(autorange="reversed")
+    max_count = max(chart_df["Count"].max(), 1)
+    fig.update_xaxes(range=[0, max_count * 1.20])
+    return base_plot_layout(fig, 500)
+
+
+def plot_numeric_distribution(df: pd.DataFrame, feature: str) -> go.Figure:
+    series = df[feature].dropna()
+    fig = go.Figure()
+    fig.add_trace(
+        go.Histogram(
+            x=series,
+            nbinsx=32,
+            marker_color="#3A8688",
+            opacity=0.82,
+            name="Observations",
+            hovertemplate=f"{feature}: %{{x:.2f}}<br>Count: %{{y}}<extra></extra>",
+        )
+    )
+    mean = series.mean()
+    median = series.median()
+    fig.add_vline(
+        x=mean,
+        line_width=2,
+        line_dash="dash",
+        line_color="#1F5F75",
+        annotation_text=f"Mean {mean:.2f}",
+        annotation_position="top right",
+    )
+    fig.add_vline(
+        x=median,
+        line_width=2,
+        line_dash="dot",
+        line_color="#6B7F93",
+        annotation_text=f"Median {median:.2f}",
+        annotation_position="top left",
+    )
+    fig.update_layout(
+        title=f"Distribution of {feature}",
+        xaxis_title=f"{feature} — {NUMERIC_UNITS[feature]}",
+        yaxis_title="Number of observations",
+        bargap=0.04,
+        showlegend=False,
+    )
+    return base_plot_layout(fig, 470)
+
+
+def numeric_question(feature: str) -> str:
+    questions = {
+        "Age": "Are age distributions different across obesity categories?",
+        "Weight": "How does weight change across obesity categories?",
+        "Height": "Does height differ meaningfully across obesity categories?",
+        "FCVC": "How does vegetable-consumption frequency vary across obesity categories?",
+        "NCP": "Do main-meal patterns differ across obesity categories?",
+        "CH2O": "How does reported water consumption vary across obesity categories?",
+        "FAF": "Does physical-activity frequency decline across higher obesity categories?",
+        "TUE": "Does technology-use frequency differ across obesity categories?",
+    }
+    return questions.get(feature, f"How does {feature} vary across obesity categories?")
+
+
+def plot_numeric_by_class(df: pd.DataFrame, feature: str) -> go.Figure:
+    chart_df = df[[TARGET, feature]].copy()
+    chart_df["Obesity Category"] = chart_df[TARGET].map(DISPLAY_LABELS)
+
+    fig = go.Figure()
+    for cls in OBESITY_ORDER:
+        subset = chart_df[chart_df[TARGET] == cls]
+        fig.add_trace(
+            go.Box(
+                x=subset[feature],
+                y=[display_label(cls)] * len(subset),
+                name=display_label(cls),
+                marker_color=OBESITY_COLORS[cls],
+                line_color=OBESITY_COLORS[cls],
+                boxpoints="outliers",
+                orientation="h",
+                showlegend=False,
+                hovertemplate=f"{feature}: %{{x:.2f}}<extra>{display_label(cls)}</extra>",
+            )
+        )
+
+    means = df.groupby(TARGET, observed=True)[feature].mean().reindex(OBESITY_ORDER)
+    fig.add_trace(
+        go.Scatter(
+            x=means.values,
+            y=[display_label(c) for c in OBESITY_ORDER],
+            mode="markers",
+            name="Class mean",
+            marker=dict(symbol="diamond", size=9, color="#16303A"),
+            hovertemplate="Mean: %{x:.2f}<extra></extra>",
+        )
+    )
+
+    fig.update_layout(
+        title=numeric_question(feature),
+        xaxis_title=f"{feature} — {NUMERIC_UNITS[feature]}",
+        yaxis_title="",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+    )
+    fig.update_yaxes(
+        categoryorder="array",
+        categoryarray=[display_label(c) for c in OBESITY_ORDER],
+        autorange="reversed",
+    )
+    return base_plot_layout(fig, 560)
+
+
+def plot_weight_height(df: pd.DataFrame) -> go.Figure:
+    chart_df = df.copy()
+    chart_df["Obesity Category"] = chart_df[TARGET].map(DISPLAY_LABELS)
+
+    fig = px.scatter(
+        chart_df,
+        x="Height",
+        y="Weight",
+        color=TARGET,
+        category_orders={TARGET: OBESITY_ORDER},
+        color_discrete_map=OBESITY_COLORS,
+        hover_data={
+            TARGET: False,
+            "Obesity Category": True,
+            "Age": ":.1f",
+            "Gender": True,
+            "Height": ":.3f",
+            "Weight": ":.1f",
+            "BMI": ":.2f",
+        },
+        opacity=0.68,
+        render_mode="webgl",
+        labels={TARGET: "Obesity category"},
+        title="Weight vs Height by Obesity Category",
+    )
+    fig.update_layout(
+        xaxis_title="Height (m)",
+        yaxis_title="Weight (kg)",
+        legend_title_text="Obesity category",
+    )
+    return base_plot_layout(fig, 600)
+
+
+def plot_categorical_relationship(df: pd.DataFrame, feature: str) -> go.Figure:
+    counts = (
+        df.groupby([feature, TARGET], observed=True)
+        .size()
+        .reset_index(name="Count")
+    )
+    totals = counts.groupby(feature)["Count"].transform("sum")
+    counts["Percentage"] = counts["Count"] / totals
+    counts["Feature Label"] = counts[feature].map(humanize_category)
+
+    observed_order = [v for v in EXPECTED_CATEGORIES.get(feature, []) if v in df[feature].unique()]
+    if not observed_order:
+        observed_order = list(df[feature].dropna().unique())
+    x_order = [humanize_category(v) for v in observed_order]
+
+    fig = go.Figure()
+    for cls in OBESITY_ORDER:
+        subset = counts[counts[TARGET] == cls].copy()
+        # Reindex to retain factor-category order even if a class/category combination is absent.
+        lookup = subset.set_index(feature)
+        percentages = []
+        raw_counts = []
+        for value in observed_order:
+            if value in lookup.index:
+                row = lookup.loc[value]
+                if isinstance(row, pd.DataFrame):
+                    row = row.iloc[0]
+                percentages.append(float(row["Percentage"]))
+                raw_counts.append(int(row["Count"]))
+            else:
+                percentages.append(0.0)
+                raw_counts.append(0)
+
+        fig.add_trace(
+            go.Bar(
+                x=x_order,
+                y=percentages,
+                name=display_label(cls),
+                marker_color=OBESITY_COLORS[cls],
+                customdata=np.column_stack([raw_counts]),
+                text=[f"{p:.0%}" if p >= 0.08 else "" for p in percentages],
+                textposition="inside",
+                hovertemplate=(
+                    "%{x}<br>" + display_label(cls) +
+                    "<br>Share within group: %{y:.2%}<br>Count: %{customdata[0]}<extra></extra>"
+                ),
+            )
+        )
+
+    fig.update_layout(
+        title=f"Obesity Composition Within {humanize_category(feature)} Groups",
+        xaxis_title=humanize_category(feature),
+        yaxis_title="Percentage within selected group",
+        barmode="stack",
+        legend_title_text="Obesity category",
+    )
+    fig.update_yaxes(tickformat=".0%", range=[0, 1])
+    return base_plot_layout(fig, 560)
+
+
+def categorical_insight(df: pd.DataFrame, feature: str) -> str:
+    severe = df[TARGET].isin(["Obesity_Type_I", "Obesity_Type_II", "Obesity_Type_III"])
+    summary = (
+        df.assign(_severe=severe)
+        .groupby(feature, observed=True)
+        .agg(Group_Size=(TARGET, "size"), Severe_Share=("_severe", "mean"))
+        .sort_values("Severe_Share", ascending=False)
+    )
+    highest = summary.iloc[0]
+    lowest = summary.iloc[-1]
+    high_name = humanize_category(summary.index[0])
+    low_name = humanize_category(summary.index[-1])
+    v = cramers_v(df[feature], df[TARGET])
+
+    small_group_note = ""
+    if int(highest["Group_Size"]) < 30 or int(lowest["Group_Size"]) < 30:
+        small_group_note = (
+            " At least one compared group has fewer than 30 observations, so the percentage "
+            "difference should be interpreted cautiously."
+        )
+
+    return (
+        f"The strongest severe-obesity share within {humanize_category(feature)} occurs for "
+        f"**{high_name}** ({highest['Severe_Share']:.1%}, n={int(highest['Group_Size'])}), "
+        f"compared with **{low_name}** ({lowest['Severe_Share']:.1%}, n={int(lowest['Group_Size'])}). "
+        f"Bias-corrected Cramér's V between {feature} and obesity category is **{v:.3f}**. "
+        "This is a descriptive association and should not be interpreted as causation."
+        + small_group_note
+    )
+
+
+def plot_correlation_heatmap(df: pd.DataFrame, method: str) -> go.Figure:
+    corr = df[NUMERICAL_COLUMNS].corr(method=method.lower())
+    fig = go.Figure(
+        data=go.Heatmap(
+            z=corr.values,
+            x=corr.columns,
+            y=corr.index,
+            zmin=-1,
+            zmax=1,
+            zmid=0,
+            colorscale=[
+                [0.0, "#3B6B82"],
+                [0.5, "#F7FAFA"],
+                [1.0, "#2B7A78"],
+            ],
+            text=np.round(corr.values, 2),
+            texttemplate="%{text:.2f}",
+            hovertemplate="%{y} vs %{x}<br>Correlation: %{z:.3f}<extra></extra>",
+            colorbar_title=f"{method} r",
+        )
+    )
+    fig.update_layout(
+        title=f"{method} Correlation Matrix — Numerical Predictors Only",
+        xaxis_title="",
+        yaxis_title="",
+    )
+    return base_plot_layout(fig, 600)
+
+
+# =============================================================================
+# MODEL ARTIFACT HELPERS
+# =============================================================================
+
+def get_model_classes(model_name: str, model) -> np.ndarray:
+    if model_name == "XGBoost":
+        return XGB_CLASS_NAMES.copy()
+
+    if hasattr(model, "classes_"):
+        return np.asarray(model.classes_).astype(str)
+
+    if hasattr(model, "named_steps"):
+        final_estimator = list(model.named_steps.values())[-1]
+        if hasattr(final_estimator, "classes_"):
+            return np.asarray(final_estimator.classes_).astype(str)
+
+    raise AttributeError(f"Could not determine class order for {model_name}.")
+
+
+def get_model_feature_names(model_name: str, model, X_test: Optional[pd.DataFrame]) -> List[str]:
+    if model_name == "XGBoost" and hasattr(model, "get_booster"):
+        names = model.get_booster().feature_names
+        if names:
+            return list(names)
+
+    if hasattr(model, "feature_names_in_"):
+        return [str(x) for x in model.feature_names_in_]
+
+    if X_test is not None and hasattr(X_test, "columns"):
+        return [str(x) for x in X_test.columns]
+
+    raise AttributeError(f"Feature names are unavailable for {model_name}.")
+
+
+def weighted_ovr_auc(y_true: np.ndarray, y_proba: np.ndarray, classes: np.ndarray) -> float:
+    y_bin = label_binarize(y_true, classes=classes)
+    return float(
+        roc_auc_score(
+            y_bin,
+            y_proba,
+            average="weighted",
+            multi_class="ovr",
+        )
+    )
+
+
+def calculate_saved_metrics(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    y_proba: np.ndarray,
+    classes: np.ndarray,
+) -> Dict[str, float]:
+    return {
+        "Accuracy": float(accuracy_score(y_true, y_pred)),
+        "Precision": float(precision_score(y_true, y_pred, average="weighted", zero_division=0)),
+        "Recall": float(recall_score(y_true, y_pred, average="weighted", zero_division=0)),
+        "Weighted F1": float(f1_score(y_true, y_pred, average="weighted", zero_division=0)),
+        "Macro F1": float(f1_score(y_true, y_pred, average="macro", zero_division=0)),
+        "ROC-AUC": weighted_ovr_auc(y_true, y_proba, classes),
+        "Errors": int(np.sum(y_true != y_pred)),
+        "Test Size": int(len(y_true)),
+    }
+
+
+def validate_evaluation_artifacts(
+    model_name: str,
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    y_proba: np.ndarray,
+    classes: np.ndarray,
+) -> None:
+    if y_proba.ndim > 2:
+        y_proba = np.squeeze(y_proba)
+    if y_proba.ndim != 2:
+        raise ValueError("predict_proba artifact must be a 2-D array")
+    if len(y_true) != len(y_pred):
+        raise ValueError("prediction length does not match y_test")
+    if y_proba.shape[0] != len(y_true):
+        raise ValueError("probability row count does not match y_test")
+    if y_proba.shape[1] != len(classes):
+        raise ValueError(
+            f"probability columns ({y_proba.shape[1]}) do not match class count ({len(classes)})"
+        )
+    if not np.allclose(y_proba.sum(axis=1), 1.0, atol=1e-4):
+        raise ValueError("probability rows do not sum to 1 within tolerance")
+    if not set(np.unique(y_true)).issubset(set(classes)):
+        raise ValueError("y_test contains labels outside the model probability class order")
+    if not set(np.unique(y_pred)).issubset(set(classes)):
+        raise ValueError("saved predictions contain labels outside the model class set")
+
+
+def notebook_match(model_name: str, metrics: Dict[str, float], tolerance: float = 0.0015) -> Tuple[bool, str]:
+    expected = NOTEBOOK_TEST_RESULTS.get(model_name)
+    if expected is None:
+        return True, "No notebook reference configured."
+
+    mismatches = []
+    for key in ["Accuracy", "Precision", "Recall", "Weighted F1", "Macro F1", "ROC-AUC"]:
+        if abs(metrics[key] - expected[key]) > tolerance:
+            mismatches.append(f"{key}: app {metrics[key]:.4f} vs notebook {expected[key]:.4f}")
+    if int(metrics["Errors"]) != int(expected["Errors"]):
+        mismatches.append(f"Errors: app {metrics['Errors']} vs notebook {expected['Errors']}")
+
+    if mismatches:
+        return False, "; ".join(mismatches)
+    return True, "Saved artifacts match the executed notebook reference values within rounding tolerance."
+
+
+def load_evaluation_artifact(model_name: str) -> Tuple[Optional[Dict], Optional[str]]:
+    config = MODEL_REGISTRY[model_name]
+    required = [
+        config["model_path"],
+        X_TEST_PATH,
+        Y_TEST_PATH,
+        config["y_pred_path"],
+        config["y_proba_path"],
+    ]
+    missing = [path for path in required if not Path(path).exists()]
+    if missing:
+        return None, "Missing required evaluation file(s): " + ", ".join(missing)
+
+    try:
+        model = load_model(config["model_path"])
+        X_test = load_joblib_data(X_TEST_PATH)
+        y_true = np.asarray(load_joblib_data(Y_TEST_PATH)).ravel().astype(str)
+        y_pred = np.asarray(load_joblib_data(config["y_pred_path"])).ravel().astype(str)
+        y_proba = np.asarray(load_joblib_data(config["y_proba_path"]), dtype=float)
+        if y_proba.ndim > 2:
+            y_proba = np.squeeze(y_proba)
+        classes = get_model_classes(model_name, model)
+        validate_evaluation_artifacts(model_name, y_true, y_pred, y_proba, classes)
+        metrics = calculate_saved_metrics(y_true, y_pred, y_proba, classes)
+        matches, match_message = notebook_match(model_name, metrics)
+
+        return {
+            "model": model,
+            "X_test": X_test,
+            "y_true": y_true,
+            "y_pred": y_pred,
+            "y_proba": y_proba,
+            "classes": classes,
+            "metrics": metrics,
+            "notebook_match": matches,
+            "notebook_match_message": match_message,
+        }, None
+    except Exception as exc:
+        return None, f"Could not load/validate {model_name} evaluation artifacts: {exc}"
+
+
+def get_cv_dataframe() -> Tuple[pd.DataFrame, str]:
+    if Path(CV_RESULTS_CSV).exists():
+        try:
+            cv_df = pd.read_csv(CV_RESULTS_CSV)
+            required = {"Model", "CV Accuracy", "CV Accuracy Std", "CV F1", "CV F1 Std"}
+            if required.issubset(cv_df.columns):
+                return cv_df[list(required)].copy(), "Saved CV CSV"
+        except Exception:
+            pass
+
+    rows = []
+    for model_name, values in NOTEBOOK_CV_RESULTS.items():
+        rows.append({"Model": model_name, **values})
+    return pd.DataFrame(rows), "Executed notebook reference"
+
+
+def build_comparison_dataframe() -> Tuple[pd.DataFrame, Dict[str, Dict], List[str]]:
+    rows = []
+    artifacts = {}
+    warnings = []
+
+    for model_name in MODEL_REGISTRY:
+        artifact, error = load_evaluation_artifact(model_name)
+        if artifact is not None:
+            artifacts[model_name] = artifact
+            row = {"Model": model_name, **artifact["metrics"], "Metric Source": "Saved artifacts"}
+            rows.append(row)
+            if not artifact["notebook_match"]:
+                warnings.append(f"{model_name}: {artifact['notebook_match_message']}")
+        else:
+            # Presentation fallback: use executed-notebook reference values only, clearly labelled.
+            expected = NOTEBOOK_TEST_RESULTS.get(model_name)
+            if expected:
+                rows.append(
+                    {
+                        "Model": model_name,
+                        **expected,
+                        "Test Size": 627,
+                        "Metric Source": "Executed notebook reference",
+                    }
+                )
+            warnings.append(f"{model_name}: {error}")
+
+    comparison = pd.DataFrame(rows)
+    cv_df, cv_source = get_cv_dataframe()
+    if not comparison.empty:
+        comparison = comparison.merge(cv_df, on="Model", how="left")
+    comparison.attrs["cv_source"] = cv_source
+    return comparison, artifacts, warnings
+
+
+# =============================================================================
+# MODEL EVALUATION VISUALISATIONS
+# =============================================================================
+
+def confusion_details(artifact: Dict) -> Dict:
+    cm = confusion_matrix(
+        artifact["y_true"],
+        artifact["y_pred"],
+        labels=OBESITY_ORDER,
+    )
+    row_totals = cm.sum(axis=1, keepdims=True)
+    cm_pct = np.divide(cm, row_totals, out=np.zeros_like(cm, dtype=float), where=row_totals != 0) * 100
+    recalls = np.diag(cm_pct)
+
+    best_idx = int(np.argmax(recalls))
+    hardest_idx = int(np.argmin(recalls))
+
+    best_pair = None
+    best_pair_count = -1
+    for i in range(len(OBESITY_ORDER)):
+        for j in range(i + 1, len(OBESITY_ORDER)):
+            total_pair = int(cm[i, j] + cm[j, i])
+            if total_pair > best_pair_count:
+                best_pair_count = total_pair
+                best_pair = (OBESITY_ORDER[i], OBESITY_ORDER[j])
+
+    return {
+        "cm": cm,
+        "cm_pct": cm_pct,
+        "best_class": OBESITY_ORDER[best_idx],
+        "best_recall": recalls[best_idx] / 100,
+        "hardest_class": OBESITY_ORDER[hardest_idx],
+        "hardest_recall": recalls[hardest_idx] / 100,
+        "pair": best_pair,
+        "pair_count": best_pair_count,
+        "pair_adjacent": (
+            abs(OBESITY_ORDER.index(best_pair[0]) - OBESITY_ORDER.index(best_pair[1])) == 1
+            if best_pair else False
+        ),
+    }
+
+
+def plot_confusion_matrix(artifact: Dict, mode: str) -> go.Figure:
+    details = confusion_details(artifact)
+    labels = [display_label(c) for c in OBESITY_ORDER]
+
+    if mode == "Percentage":
+        z = details["cm_pct"]
+        text = [[f"{v:.1f}%" for v in row] for row in z]
+        hover = "Actual: %{y}<br>Predicted: %{x}<br>Row share: %{z:.2f}%<extra></extra>"
+        title = "Confusion Matrix — Row-wise Percentage"
+        colorbar_title = "% of actual class"
+    else:
+        z = details["cm"]
+        text = [[str(int(v)) for v in row] for row in z]
+        hover = "Actual: %{y}<br>Predicted: %{x}<br>Count: %{z}<extra></extra>"
+        title = "Confusion Matrix — Counts"
+        colorbar_title = "Count"
+
+    fig = go.Figure(
+        go.Heatmap(
+            z=z,
+            x=labels,
+            y=labels,
+            colorscale=[[0, "#F7FAFA"], [1, "#25666D"]],
+            text=text,
+            texttemplate="%{text}",
+            hovertemplate=hover,
+            colorbar_title=colorbar_title,
+        )
+    )
+    fig.update_layout(title=title, xaxis_title="Predicted category", yaxis_title="Actual category")
+    fig.update_yaxes(autorange="reversed")
+    return base_plot_layout(fig, 650)
+
+
+def class_performance_dataframe(artifact: Dict) -> pd.DataFrame:
+    report = classification_report(
+        artifact["y_true"],
+        artifact["y_pred"],
+        labels=OBESITY_ORDER,
+        output_dict=True,
+        zero_division=0,
+    )
+    rows = []
+    for cls in OBESITY_ORDER:
+        values = report.get(cls, {})
+        rows.append(
+            {
+                "Class": cls,
+                "Obesity Category": display_label(cls),
+                "Precision": values.get("precision", np.nan),
+                "Recall": values.get("recall", np.nan),
+                "F1": values.get("f1-score", np.nan),
+                "Support": int(values.get("support", 0)),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def plot_class_performance(class_df: pd.DataFrame) -> go.Figure:
+    long = class_df.melt(
+        id_vars=["Class", "Obesity Category"],
+        value_vars=["Precision", "Recall", "F1"],
+        var_name="Metric",
+        value_name="Score",
+    )
+    fig = px.bar(
+        long,
+        y="Obesity Category",
+        x="Score",
+        color="Metric",
+        barmode="group",
+        orientation="h",
+        color_discrete_map={"Precision": "#6B7F93", "Recall": "#3A8688", "F1": "#1F5F75"},
+        title="Class-level Precision, Recall and F1",
+        category_orders={"Obesity Category": [display_label(c) for c in OBESITY_ORDER]},
+        text_auto=".2f",
+    )
+    fig.update_layout(xaxis_title="Score", yaxis_title="")
+    fig.update_xaxes(range=[0, 1])
+    fig.update_yaxes(autorange="reversed")
+    return base_plot_layout(fig, 600)
+
+
+def compute_roc_details(artifact: Dict) -> Dict:
+    y_true = artifact["y_true"]
+    y_proba = artifact["y_proba"]
+    classes = np.asarray(artifact["classes"]).astype(str)
+
+    fpr = {}
+    tpr = {}
+    class_auc = {}
+
+    for cls in OBESITY_ORDER:
+        idx_matches = np.where(classes == cls)[0]
+        if len(idx_matches) != 1:
+            continue
+        idx = int(idx_matches[0])
+        binary_true = (y_true == cls).astype(int)
+        cls_fpr, cls_tpr, _ = roc_curve(binary_true, y_proba[:, idx])
+
+        # Defensive endpoint handling for presentation consistency.
+        if cls_fpr[0] != 0.0 or cls_tpr[0] != 0.0:
+            cls_fpr = np.insert(cls_fpr, 0, 0.0)
+            cls_tpr = np.insert(cls_tpr, 0, 0.0)
+        if cls_fpr[-1] != 1.0 or cls_tpr[-1] != 1.0:
+            cls_fpr = np.append(cls_fpr, 1.0)
+            cls_tpr = np.append(cls_tpr, 1.0)
+
+        fpr[cls] = cls_fpr
+        tpr[cls] = cls_tpr
+        class_auc[cls] = float(auc(cls_fpr, cls_tpr))
+
+    y_bin = label_binarize(y_true, classes=classes)
+    fpr_micro, tpr_micro, _ = roc_curve(y_bin.ravel(), y_proba.ravel())
+    auc_micro = float(auc(fpr_micro, tpr_micro))
+
+    all_fpr = np.unique(np.concatenate([fpr[c] for c in fpr]))
+    mean_tpr = np.zeros_like(all_fpr)
+    for cls in fpr:
+        mean_tpr += np.interp(all_fpr, fpr[cls], tpr[cls])
+    mean_tpr /= max(len(fpr), 1)
+    auc_macro_curve = float(auc(all_fpr, mean_tpr))
+
+    return {
+        "fpr": fpr,
+        "tpr": tpr,
+        "class_auc": class_auc,
+        "micro": (fpr_micro, tpr_micro, auc_micro),
+        "macro": (all_fpr, mean_tpr, auc_macro_curve),
+    }
+
+
+def plot_roc_classes(roc_details: Dict) -> go.Figure:
+    fig = go.Figure()
+    for cls in OBESITY_ORDER:
+        if cls not in roc_details["fpr"]:
+            continue
+        fig.add_trace(
+            go.Scatter(
+                x=roc_details["fpr"][cls],
+                y=roc_details["tpr"][cls],
+                mode="lines",
+                name=f"{display_label(cls)} (AUC {roc_details['class_auc'][cls]:.3f})",
+                line=dict(color=OBESITY_COLORS[cls], width=2),
+            )
+        )
+    fig.add_trace(
+        go.Scatter(
+            x=[0, 1],
+            y=[0, 1],
+            mode="lines",
+            name="Random baseline (AUC 0.5)",
+            line=dict(color="#7A8B92", dash="dash", width=1.5),
+        )
+    )
+    fig.update_layout(
+        title="One-vs-Rest ROC Curves by Obesity Category",
+        xaxis_title="False Positive Rate",
+        yaxis_title="True Positive Rate",
+        legend=dict(orientation="v", x=1.01, y=1),
+    )
+    fig.update_xaxes(range=[0, 1])
+    fig.update_yaxes(range=[0, 1])
+    return base_plot_layout(fig, 600)
+
+
+def plot_roc_averages(roc_details: Dict) -> go.Figure:
+    micro_fpr, micro_tpr, micro_auc = roc_details["micro"]
+    macro_fpr, macro_tpr, macro_auc = roc_details["macro"]
+
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=micro_fpr,
+            y=micro_tpr,
+            mode="lines",
+            name=f"Micro-average (AUC {micro_auc:.3f})",
+            line=dict(color="#1F5F75", width=3),
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=macro_fpr,
+            y=macro_tpr,
+            mode="lines",
+            name=f"Macro-average (AUC {macro_auc:.3f})",
+            line=dict(color="#3A8688", width=3, dash="dot"),
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[0, 1],
+            y=[0, 1],
+            mode="lines",
+            name="Random baseline",
+            line=dict(color="#7A8B92", dash="dash", width=1.5),
+        )
+    )
+    fig.update_layout(
+        title="Micro- and Macro-average ROC Curves",
+        xaxis_title="False Positive Rate",
+        yaxis_title="True Positive Rate",
+    )
+    fig.update_xaxes(range=[0, 1])
+    fig.update_yaxes(range=[0, 1])
+    return base_plot_layout(fig, 520)
+
+
+def strip_transformer_prefix(name: str) -> str:
+    return str(name).split("__", 1)[-1]
+
+
+def model_feature_analysis(model_name: str, artifact: Dict) -> Tuple[Optional[pd.DataFrame], str, str]:
+    model = artifact["model"]
+    X_test = artifact["X_test"]
+
+    if model_name == "K-Nearest Neighbours (KNN)":
+        path = first_existing_path(MODEL_REGISTRY[model_name]["feature_data_candidates"])
+        if path is None:
+            return (
+                None,
+                "KNN has no intrinsic feature importance.",
+                "The notebook used permutation importance. Its saved CSV was not found, so no feature ranking is fabricated here.",
+            )
+        df = pd.read_csv(path)
+        possible = [
+            "Importance (mean drop in accuracy)",
+            "Importance",
+            "Mean Importance",
+        ]
+        importance_col = next((c for c in possible if c in df.columns), None)
+        if "Feature" not in df.columns or importance_col is None:
+            return None, "Permutation importance unavailable", "The saved KNN CSV format was not recognised."
+        out = df[["Feature", importance_col]].copy()
+        out.columns = ["Feature", "Importance"]
+        out = out.sort_values("Importance", ascending=False).head(15)
+        return (
+            out,
+            "KNN permutation importance (saved notebook analysis)",
+            "Permutation importance measures the drop in predictive performance when a feature is shuffled; it is not built into KNN.",
+        )
+
+    if model_name == "Logistic Regression":
+        estimator = model
+        feature_names = None
+        if hasattr(model, "named_steps"):
+            final_estimator = model.named_steps.get("logistic_regression")
+            if final_estimator is None:
+                final_estimator = list(model.named_steps.values())[-1]
+            estimator = final_estimator
+
+            preprocessor = model.named_steps.get("preprocessor")
+            if preprocessor is not None and hasattr(preprocessor, "get_feature_names_out"):
+                try:
+                    input_names = get_model_feature_names(model_name, model, X_test)
+                    feature_names = [
+                        strip_transformer_prefix(x)
+                        for x in preprocessor.get_feature_names_out(input_names)
+                    ]
+                except Exception:
+                    feature_names = None
+
+        if not hasattr(estimator, "coef_"):
+            return None, "Coefficient analysis unavailable", "The fitted Logistic Regression coefficients could not be accessed."
+
+        coefficients = np.asarray(estimator.coef_)
+        importance = np.mean(np.abs(coefficients), axis=0)
+        if feature_names is None:
+            feature_names = get_model_feature_names(model_name, model, X_test)
+        if len(feature_names) != len(importance):
+            return None, "Coefficient analysis unavailable", "Coefficient count does not match available feature names."
+
+        out = pd.DataFrame({"Feature": feature_names, "Importance": importance})
+        out = out.sort_values("Importance", ascending=False).head(15)
+        return (
+            out,
+            "Logistic Regression mean absolute coefficient magnitude",
+            "Coefficient magnitude indicates how strongly a standardised model coefficient contributes across the seven one-vs-rest/multiclass coefficient vectors. It is not tree feature importance and does not imply causality.",
+        )
+
+    if hasattr(model, "feature_importances_"):
+        feature_names = get_model_feature_names(model_name, model, X_test)
+        values = np.asarray(model.feature_importances_)
+        if len(feature_names) != len(values):
+            return None, "Tree feature importance unavailable", "Importance count does not match feature names."
+        out = pd.DataFrame({"Feature": feature_names, "Importance": values})
+        out = out.sort_values("Importance", ascending=False).head(15)
+        if model_name == "XGBoost":
+            title = "XGBoost gain-based feature importance"
+            note = "The fitted XGBoost model uses tree-based importance_type='gain'. Importance is model association, not causal effect."
+        else:
+            title = "Random Forest tree-based feature importance"
+            note = "Random Forest importance reflects impurity reduction across fitted trees. Importance is model association, not causal effect."
+        return out, title, note
+
+    return None, "Feature analysis unavailable", "This model does not expose a supported feature-analysis artifact."
+
+
+def plot_feature_analysis(feature_df: pd.DataFrame, title: str) -> go.Figure:
+    chart = feature_df.sort_values("Importance", ascending=True).copy()
+    fig = go.Figure(
+        go.Bar(
+            x=chart["Importance"],
+            y=chart["Feature"],
+            orientation="h",
+            marker_color="#2B7A78",
+            text=[f"{v:.3f}" for v in chart["Importance"]],
+            textposition="outside",
+            hovertemplate="%{y}<br>Value: %{x:.5f}<extra></extra>",
+        )
+    )
+    fig.update_layout(title=title, xaxis_title="Importance / coefficient magnitude", yaxis_title="")
+    return base_plot_layout(fig, 560)
+
+
+def original_feature_name(encoded_name: str) -> str:
+    name = strip_transformer_prefix(encoded_name)
+    if name in NUMERICAL_COLUMNS:
+        return name
+    for base in CATEGORICAL_COLUMNS:
+        if name == base or name.startswith(base + "_"):
+            return base
+    return name
+
+
+def aggregate_feature_importance(feature_df: pd.DataFrame) -> pd.DataFrame:
+    work = feature_df.copy()
+    work["Original Feature"] = work["Feature"].map(original_feature_name)
+    return (
+        work.groupby("Original Feature", as_index=False)["Importance"]
+        .sum()
+        .sort_values("Importance", ascending=False)
+    )
+
+
+# =============================================================================
+# PREDICTION HELPERS
+# =============================================================================
+
+def get_prediction_columns(model_name: str, model) -> List[str]:
+    # Prefer the exact shared X_test artifact schema because the trained models
+    # were deployed against this 23-column encoded format.
+    if Path(X_TEST_PATH).exists():
+        try:
+            X_test = load_joblib_data(X_TEST_PATH)
+            if isinstance(X_test, pd.DataFrame):
+                if model_name == "XGBoost" and hasattr(model, "get_booster"):
+                    booster_names = model.get_booster().feature_names
+                    if booster_names:
+                        if list(booster_names) != X_test.columns.tolist():
+                            raise ValueError(
+                                "XGBoost booster feature names do not match shared X_test_encoded columns."
+                            )
+                        return list(booster_names)
+                return X_test.columns.tolist()
+        except Exception:
+            pass
+
+    return get_model_feature_names(model_name, model, None)
+
+
+def build_encoded_prediction_row(model_name: str, model, values: Dict) -> pd.DataFrame:
+    columns = get_prediction_columns(model_name, model)
+    row = pd.DataFrame(0.0, index=[0], columns=columns)
+
+    for col in NUMERICAL_COLUMNS:
+        if col in row.columns:
+            row.at[0, col] = float(values[col])
+
+    categorical_values = {
+        "Gender": values["Gender"],
+        "family_history_with_overweight": values["family_history_with_overweight"],
+        "FAVC": values["FAVC"],
+        "CAEC": values["CAEC"],
+        "SMOKE": values["SMOKE"],
+        "SCC": values["SCC"],
+        "CALC": values["CALC"],
+        "MTRANS": values["MTRANS"],
+    }
+
+    # Training used pd.get_dummies(..., drop_first=True). If a category's dummy
+    # column is absent, that category is the training reference level and the
+    # all-zero representation is therefore correct.
+    for feature, selected_value in categorical_values.items():
+        dummy_name = f"{feature}_{selected_value}"
+        if dummy_name in row.columns:
+            row.at[0, dummy_name] = 1.0
+
+    return row
+
+
+def make_prediction(model_name: str, input_values: Dict) -> Dict:
+    model_path = MODEL_REGISTRY[model_name]["model_path"]
+    if not Path(model_path).exists():
+        raise FileNotFoundError(f"Required model file not found: {model_path}")
+
+    model = load_model(model_path)
+    encoded_row = build_encoded_prediction_row(model_name, model, input_values)
+
+    raw_pred = model.predict(encoded_row)[0]
+    proba = np.asarray(model.predict_proba(encoded_row)[0], dtype=float)
+
+    if model_name == "XGBoost":
+        pred_label = str(XGB_CLASS_NAMES[int(raw_pred)])
+        proba_classes = XGB_CLASS_NAMES.copy()
+    else:
+        pred_label = str(raw_pred)
+        proba_classes = get_model_classes(model_name, model)
+
+    if len(proba) != len(proba_classes):
+        raise ValueError("Prediction probability count does not match model class count.")
+
+    return {
+        "model": model_name,
+        "prediction": pred_label,
+        "confidence": float(proba.max()),
+        "classes": proba_classes,
+        "probabilities": proba,
+        "encoded_columns": list(encoded_row.columns),
+    }
+
+
+# =============================================================================
+# DATA-DRIVEN STORYTELLING
+# =============================================================================
+
+def key_analytical_insights(df: pd.DataFrame) -> List[Dict[str, str]]:
+    bmi_means = df.groupby(TARGET, observed=True)["BMI"].mean().reindex(OBESITY_ORDER)
+    faf_means = df.groupby(TARGET, observed=True)["FAF"].mean().reindex(OBESITY_ORDER)
+
+    severe = df[TARGET].isin(["Obesity_Type_I", "Obesity_Type_II", "Obesity_Type_III"])
+    family = (
+        df.assign(_severe=severe)
+        .groupby("family_history_with_overweight", observed=True)["_severe"]
+        .mean()
+    )
+
+    favc = (
+        df.groupby(TARGET, observed=True)["FAVC"]
+        .apply(lambda s: (s == "yes").mean())
+        .reindex(OBESITY_ORDER)
+    )
+
+    class_counts = df[TARGET].value_counts(normalize=True).reindex(OBESITY_ORDER)
+
+    return [
+        {
+            "Finding": "The seven target classes remain relatively balanced after duplicate removal.",
+            "Evidence": (
+                f"Class shares range from {class_counts.min():.2%} to {class_counts.max():.2%} "
+                f"across {len(df):,} cleaned observations."
+            ),
+            "Interpretation": "No single class dominates the cleaned modelling dataset, so accuracy is less likely to be inflated by a majority-class strategy.",
+            "Practical Relevance": "Model comparison can focus on balanced multiclass metrics such as weighted/macro F1 alongside accuracy.",
+        },
+        {
+            "Finding": "Body-size measurements strongly separate the ordered obesity categories.",
+            "Evidence": (
+                f"Mean BMI rises from {bmi_means.iloc[0]:.2f} in {display_label(OBESITY_ORDER[0])} "
+                f"to {bmi_means.iloc[-1]:.2f} in {display_label(OBESITY_ORDER[-1])}."
+            ),
+            "Interpretation": "Height and weight jointly form clear bands across the target classes in this dataset.",
+            "Practical Relevance": "These measurements provide strong predictive signal, but their strength should be interpreted cautiously because the target definition is closely related to body size.",
+        },
+        {
+            "Finding": "Family history is strongly associated with the distribution of higher obesity categories.",
+            "Evidence": (
+                f"Severe obesity classes account for {family.get('yes', np.nan):.1%} of records with family history "
+                f"versus {family.get('no', np.nan):.1%} without it."
+            ),
+            "Interpretation": "The category composition differs substantially between the two family-history groups.",
+            "Practical Relevance": "Family history may be useful as a screening/context feature when combined with physical and lifestyle predictors.",
+        },
+        {
+            "Finding": "Reported physical-activity frequency tends to be lower in the highest obesity category.",
+            "Evidence": (
+                f"Mean FAF is {faf_means.iloc[0]:.2f} in {display_label(OBESITY_ORDER[0])} and "
+                f"{faf_means.iloc[-1]:.2f} in {display_label(OBESITY_ORDER[-1])}."
+            ),
+            "Interpretation": "The distributions overlap, so activity alone does not perfectly separate classes, but the downward tendency adds multivariable signal.",
+            "Practical Relevance": "Lifestyle variables can complement body measurements rather than acting as standalone decision rules.",
+        },
+        {
+            "Finding": "Frequent high-calorie food consumption is highly prevalent in several severe obesity classes.",
+            "Evidence": (
+                f"FAVC='yes' is {favc.loc['Obesity_Type_III']:.1%} in Obesity Type III and "
+                f"{favc.loc['Normal_Weight']:.1%} in Normal Weight."
+            ),
+            "Interpretation": "The observed dietary composition differs by obesity category, although the relationship is not perfectly monotonic across all seven classes.",
+            "Practical Relevance": "Dietary indicators can support richer risk classification when interpreted together with demographic and physical features.",
+        },
+    ]
+
+
+# =============================================================================
+# PAGE RENDERERS
+# =============================================================================
+
+def render_overview_page(raw: pd.DataFrame, clean: pd.DataFrame) -> None:
+    render_hero(
+        "Obesity Risk Analytics & Classification Dashboard",
+        "Interactive exploration and machine-learning classification of obesity levels using demographic, dietary, physical and lifestyle characteristics.",
+    )
+    render_source_pills(["CRISP-DM", "2,087 cleaned records", "7 classes", "4 ML models", "No retraining in app"])
+
+    st.markdown("### Project at a glance")
+    render_kpi_grid(
+        [
+            ("Clean Records", f"{len(clean):,}", "After removing exact duplicates"),
+            ("Predictors", "16", "8 numerical + 8 categorical"),
+            ("Obesity Classes", f"{clean[TARGET].nunique()}", "Multiclass classification target"),
+            ("ML Models", "4", "Logistic, KNN, Random Forest, XGBoost"),
+        ]
+    )
+
+    left, right = st.columns([1.15, 0.85])
+    with left:
+        st.markdown("### Project objective")
+        st.write(
+            "The project classifies individuals into seven obesity-level categories using 16 predictors covering "
+            "demographics, physical measurements, eating habits and lifestyle behaviour. The dashboard is designed "
+            "to communicate the full analytical chain—from data quality and EDA to model evaluation and a live "
+            "prediction prototype—without requiring the lecturer to open the notebook."
+        )
+
+        st.markdown("### Analysis workflow")
+        workflow = [
+            ("01", "Data", "Load the UCI obesity dataset and understand its 17 variables."),
+            ("02", "Preparation", "Assess quality, remove 24 duplicates, split 70:30 with stratification, encode and scale where required."),
+            ("03", "EDA", "Explore distributions, obesity-class relationships and appropriate association measures."),
+            ("04", "Modelling", "Compare Logistic Regression, KNN, Random Forest and XGBoost using saved project results."),
+            ("05", "Evaluation", "Inspect class-level performance, ROC behaviour, stability and error patterns."),
+            ("06", "Prediction", "Apply the saved trained models to an interactive 16-feature input form."),
+        ]
+        for number, title, text in workflow:
             st.markdown(
                 f"""
-                <div class="comparison-card {best_class}">
-                    <div>
-                        <b>#{int(row["Rank"])} {row["Model"]}</b>
-                    </div>
-                    <br>
-                    <div class="small-label">Accuracy</div>
-                    <div class="large-number">{row["Accuracy"]:.2%}</div>
-                    <br>
-                    <div>
-                        <b>F1:</b> {row["F1 Score"]:.4f}<br>
-                        <b>ROC-AUC:</b> {row["ROC-AUC"]:.4f}<br>
-                        <b>Errors:</b> {int(row["Errors"])} / {int(row["Test Size"])}
-                    </div>
+                <div class="flow-step">
+                    <div class="flow-num">{number}</div>
+                    <div class="flow-content"><b>{title}</b><br><span>{text}</span></div>
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
 
-    st.markdown("")
+    with right:
+        st.markdown("### Key analytical findings")
+        for insight in key_analytical_insights(clean)[:4]:
+            render_insight(insight["Finding"], insight["Evidence"] + " " + insight["Interpretation"])
 
-    # --------------------------------------------------------
-    # 2. INTERACTIVE METRIC COMPARISON
-    # --------------------------------------------------------
-    st.markdown("### 1. Performance Comparison")
+    st.markdown("### Dataset limitation and responsible interpretation")
+    st.warning(
+        "The UCI dataset described in the project report combines approximately 23% directly collected observations "
+        "with 77% synthetically generated observations. Very strong patterns may therefore partly reflect how the "
+        "dataset was constructed. The dashboard treats results as an academic classification prototype; external "
+        "validation would be required before any real-world deployment."
+    )
 
-    metric = st.selectbox(
-        "Select a metric to compare",
+
+
+def render_data_preparation_page(raw: pd.DataFrame, clean: pd.DataFrame) -> None:
+    render_hero(
+        "Data Preparation",
+        "A concise data-quality story showing what was checked, why it mattered, and how the 2,111 raw records became the model-ready dataset used by the project.",
+    )
+
+    missing = int(raw.isna().sum().sum())
+    duplicates = int(raw.duplicated().sum())
+    render_kpi_grid(
         [
-            "Accuracy",
-            "Precision",
-            "Recall",
-            "F1 Score",
-            "Macro F1",
-            "ROC-AUC",
-            "Error Rate",
-        ],
-        key="comparison_metric_high_mark",
+            ("Original Records", f"{len(raw):,}", "Raw UCI dataset"),
+            ("Cleaned Records", f"{len(clean):,}", "After exact duplicate removal"),
+            ("Duplicates Removed", f"{duplicates}", "Removed before train/test split"),
+            ("Missing Values", f"{missing}", "No imputation required"),
+            ("Predictors", "16", "Target excluded before modelling"),
+            ("Numerical Features", "8", "Scaled only where model requires it"),
+            ("Categorical Features", "8", "One-Hot Encoded"),
+            ("Target Classes", f"{clean[TARGET].nunique()}", "Preserved by stratification"),
+        ]
     )
 
-    chart_df = comparison_df[["Model", metric]].copy()
-
-    # For error rate, lower is better.
-    ascending = metric == "Error Rate"
-    chart_df = chart_df.sort_values(metric, ascending=ascending)
-
-    fig, ax = plt.subplots(figsize=(10, 5))
-
-    bars = ax.barh(
-        chart_df["Model"],
-        chart_df[metric],
-    )
-
-    max_value = float(chart_df[metric].max())
-
-    for bar, value in zip(bars, chart_df[metric]):
-        ax.text(
-            bar.get_width() + max(max_value * 0.015, 0.001),
-            bar.get_y() + bar.get_height() / 2,
-            f"{value:.2%}",
-            va="center",
-            fontweight="bold",
+    st.markdown("### Preprocessing pipeline")
+    steps = [
+        ("Raw Dataset", f"Started with {len(raw):,} rows × {raw.shape[1]} columns."),
+        ("Missing Value Assessment", f"Found {missing} missing values, so no imputation was introduced."),
+        ("Duplicate Detection", f"Found and removed {duplicates} exact duplicate rows before splitting."),
+        ("Categorical Consistency", "Verified expected category labels, spelling and capitalization across eight categorical predictors."),
+        ("Outlier Validation", "Used IQR flags as diagnostics; plausible bounded/extreme values were retained rather than removed automatically."),
+        ("Feature / Target Separation", "Separated 16 predictors from NObeyesdad so the target was never included as an input feature."),
+        ("70:30 Stratified Split", "Used stratify=y and random_state=42, producing 1,460 training and 627 test observations."),
+        ("Categorical Encoding", "Applied One-Hot Encoding with drop_first=True, giving the 23-feature encoded model schema."),
+        ("Numerical Scaling Where Required", "Logistic Regression and KNN deployment Pipelines scale the eight numerical predictors; Random Forest and XGBoost use encoded unscaled predictors."),
+        ("Model-Ready Dataset", "Saved models/predictions use the project's existing 23-feature deployment schema. This dashboard does not retrain or alter it."),
+    ]
+    for i, (title, text) in enumerate(steps, start=1):
+        st.markdown(
+            f"""
+            <div class="flow-step">
+                <div class="flow-num">{i}</div>
+                <div class="flow-content"><b>{title}</b><br><span>{text}</span></div>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
 
-    ax.set_xlabel(
-        "Error Rate" if metric == "Error Rate" else "Score"
+    st.markdown("### Before vs after data-quality summary")
+    quality_df = pd.DataFrame(
+        [
+            ["Records", len(raw), "Remove exact duplicates", len(clean)],
+            ["Missing values", missing, "No imputation required", int(clean.isna().sum().sum())],
+            ["Duplicate records", duplicates, "Removed before splitting", 0],
+            ["Target classes", raw[TARGET].nunique(), "Preserved with stratification", clean[TARGET].nunique()],
+            ["Predictor features", 16, "One-Hot Encode categoricals", "23 encoded features"],
+        ],
+        columns=["Data Quality Item", "Before", "Action", "After"],
     )
-    ax.set_title(
-        f"{metric} Comparison Across Models",
-        fontweight="bold",
+    st.dataframe(quality_df, use_container_width=True, hide_index=True)
+
+    st.markdown("### Train/test split and stratification")
+    from sklearn.model_selection import train_test_split
+
+    X = clean.drop(columns=[TARGET, "BMI", "AgeGroup"], errors="ignore")
+    y = clean[[TARGET]]
+    X_train, X_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=0.30,
+        stratify=y,
+        random_state=42,
     )
-    ax.grid(axis="x", alpha=0.20)
-    ax.spines[["top", "right", "left"]].set_visible(False)
 
-    upper = max_value * 1.18 if max_value > 0 else 1
-    ax.set_xlim(0, upper)
+    split_cols = st.columns([0.35, 0.65])
+    with split_cols[0]:
+        render_kpi_grid(
+            [
+                ("Training Set", f"{len(X_train):,}", "≈70% of cleaned data"),
+                ("Testing Set", f"{len(X_test):,}", "≈30% held-out data"),
+            ],
+            columns_per_row=2,
+        )
+        render_insight(
+            "Why stratification matters",
+            "The seven obesity classes remain represented in similar proportions in the full, training and test datasets. This makes model evaluation less sensitive to accidental class-proportion shifts.",
+        )
 
-    plt.tight_layout()
-    st.pyplot(fig, width="stretch")
-    plt.close(fig)
+    with split_cols[1]:
+        full_pct = y[TARGET].value_counts(normalize=True).reindex(OBESITY_ORDER)
+        train_pct = y_train[TARGET].value_counts(normalize=True).reindex(OBESITY_ORDER)
+        test_pct = y_test[TARGET].value_counts(normalize=True).reindex(OBESITY_ORDER)
+        split_df = pd.DataFrame(
+            {
+                "Obesity Category": [display_label(c) for c in OBESITY_ORDER],
+                "Full Dataset": full_pct.values,
+                "Training Set": train_pct.values,
+                "Testing Set": test_pct.values,
+            }
+        ).melt(id_vars="Obesity Category", var_name="Partition", value_name="Share")
+        fig = px.bar(
+            split_df,
+            x="Obesity Category",
+            y="Share",
+            color="Partition",
+            barmode="group",
+            color_discrete_map={
+                "Full Dataset": "#A9BEC5",
+                "Training Set": "#3A8688",
+                "Testing Set": "#1F5F75",
+            },
+            title="Target-class Proportions Across Full, Training and Testing Partitions",
+        )
+        fig.update_yaxes(tickformat=".0%", title="Share of partition")
+        fig.update_xaxes(title="")
+        st.plotly_chart(base_plot_layout(fig, 470), use_container_width=True)
 
-    # --------------------------------------------------------
-    # Performance summary table
-    # --------------------------------------------------------
-    st.markdown("#### Complete Performance Summary")
+    tab1, tab2, tab3, tab4 = st.tabs(
+        ["Categorical Consistency", "Outlier Assessment", "Encoding & Scaling", "EDA Enrichment"]
+    )
 
-    summary_display = comparison_df[
+    with tab1:
+        rows = []
+        for feature in CATEGORICAL_COLUMNS:
+            observed = sorted(clean[feature].dropna().astype(str).unique().tolist())
+            expected = sorted(EXPECTED_CATEGORIES[feature])
+            rows.append(
+                {
+                    "Feature": feature,
+                    "Unique Categories": len(observed),
+                    "Observed Labels": ", ".join(observed),
+                    "Consistency": "Pass" if observed == expected else "Review",
+                }
+            )
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        render_insight(
+            "What this shows",
+            "The cleaned data uses the expected category labels without introducing automatic spelling fixes or category merging. This keeps the dashboard consistent with the model training schema.",
+        )
+
+    with tab2:
+        outlier_df = iqr_outlier_summary(clean)
+        st.dataframe(
+            outlier_df.style.format(
+                {
+                    "IQR Lower Bound": "{:.2f}",
+                    "IQR Upper Bound": "{:.2f}",
+                    "Flagged %": "{:.2%}",
+                    "Observed Min": "{:.2f}",
+                    "Observed Max": "{:.2f}",
+                }
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
+        render_insight(
+            "Why flagged values were retained",
+            "The IQR rule is a statistical flag, not an automatic data-error rule. Age, Height, Weight and especially NCP contain IQR-flagged observations, but the project's plausibility/range checks found no obvious invalid entries. Removing them solely because they are statistically unusual would discard valid variability.",
+        )
+
+    with tab3:
+        encoding_df = pd.DataFrame(
+            [
+                ["Original predictors", 16, "8 numerical + 8 categorical"],
+                ["One-Hot Encoding", 23, "drop_first=True; training/test schema aligned"],
+                ["Logistic Regression", 23, "Encoded input → internal StandardScaler → Logistic Regression"],
+                ["KNN", 23, "Encoded input → internal StandardScaler → KNN"],
+                ["Random Forest", 23, "Encoded, unscaled predictors"],
+                ["XGBoost", 23, "Encoded, unscaled predictors with fixed booster feature names"],
+            ],
+            columns=["Stage / Model", "Feature Count", "Data Handling"],
+        )
+        st.dataframe(encoding_df, use_container_width=True, hide_index=True)
+        render_insight(
+            "Leakage-control principle",
+            "The main train/test split occurs before scaling. The deployment models do not refit preprocessing inside Streamlit: they only apply the already-fitted model/pipeline to user input.",
+        )
+
+    with tab4:
+        bmi_means = clean.groupby(TARGET, observed=True)["BMI"].mean().reindex(OBESITY_ORDER)
+        age_counts = clean["AgeGroup"].value_counts().reindex(
+            ["Teenager (≤19)", "Young Adult (20–30)", "Adult (31–45)", "Senior (46+)"]
+        )
+        col_a, col_b = st.columns(2)
+        with col_a:
+            st.markdown("**BMI — EDA-only derived variable**")
+            bmi_df = pd.DataFrame(
+                {
+                    "Obesity Category": [display_label(c) for c in OBESITY_ORDER],
+                    "Mean BMI": bmi_means.values,
+                }
+            )
+            st.dataframe(bmi_df.style.format({"Mean BMI": "{:.2f}"}), use_container_width=True, hide_index=True)
+        with col_b:
+            st.markdown("**AgeGroup — EDA-only derived variable**")
+            age_df = age_counts.rename_axis("Age Group").reset_index(name="Records")
+            st.dataframe(age_df, use_container_width=True, hide_index=True)
+        st.info(
+            "BMI and AgeGroup enrich descriptive analysis only. They are not added to the 16 trained-model predictors, so this dashboard does not change the existing model feature space or results."
+        )
+
+
+
+def render_eda_page(raw: pd.DataFrame, clean: pd.DataFrame) -> None:
+    render_hero(
+        "Exploratory Data Analysis",
+        "Interactive, question-led exploration of distributions, obesity-class relationships, lifestyle factors and statistically appropriate associations.",
+    )
+
+    st.caption("EDA uses the cleaned 2,087-record dataset so the analytical views correspond to the observations used for modelling after duplicate removal.")
+
+    st.markdown("### 1. Obesity class distribution")
+    st.plotly_chart(plot_target_distribution(clean), use_container_width=True)
+    counts = clean[TARGET].value_counts(normalize=True).reindex(OBESITY_ORDER)
+    render_insight(
+        "Why this matters for evaluation",
+        f"The smallest class represents {counts.min():.2%} and the largest {counts.max():.2%} of cleaned records. "
+        "Because no single category dominates, a majority-class shortcut is unlikely to explain strong performance. "
+        "Accuracy should still be read together with weighted F1, macro F1 and class-level recall."
+    )
+
+    st.markdown("### 2. Numerical distribution explorer")
+    selected_feature = st.selectbox(
+        "Select numerical feature",
+        NUMERICAL_COLUMNS,
+        index=NUMERICAL_COLUMNS.index("Weight"),
+        key="eda_numeric_distribution",
+    )
+    s = clean[selected_feature].dropna()
+    render_kpi_grid(
+        [
+            ("Mean", f"{s.mean():.2f}", NUMERIC_UNITS[selected_feature]),
+            ("Median", f"{s.median():.2f}", NUMERIC_UNITS[selected_feature]),
+            ("Std. Dev.", f"{s.std():.2f}", "Sample standard deviation"),
+            ("Minimum", f"{s.min():.2f}", NUMERIC_UNITS[selected_feature]),
+            ("Maximum", f"{s.max():.2f}", NUMERIC_UNITS[selected_feature]),
+            ("Skewness", f"{s.skew():.2f}", distribution_shape(float(s.skew())).capitalize()),
+        ],
+        columns_per_row=3,
+    )
+    st.plotly_chart(plot_numeric_distribution(clean, selected_feature), use_container_width=True)
+    render_insight("Analytical insight", numeric_distribution_insight(clean, selected_feature))
+
+    st.markdown("### 3. Obesity level vs numerical features")
+    selected_relation = st.selectbox(
+        "Select feature to analyse against obesity level",
+        ["Age", "Weight", "FCVC", "NCP", "CH2O", "FAF", "TUE", "Height"],
+        index=1,
+        key="eda_numeric_relationship",
+    )
+    st.plotly_chart(plot_numeric_by_class(clean, selected_relation), use_container_width=True)
+    render_insight("What this shows", class_trend_insight(clean, selected_relation))
+
+    st.markdown("### 4. Weight–height relationship")
+    st.plotly_chart(plot_weight_height(clean), use_container_width=True)
+    bmi_means = clean.groupby(TARGET, observed=True)["BMI"].mean().reindex(OBESITY_ORDER)
+    render_insight(
+        "Why the joint pattern matters",
+        f"Mean BMI rises from {bmi_means.iloc[0]:.2f} in {display_label(OBESITY_ORDER[0])} to "
+        f"{bmi_means.iloc[-1]:.2f} in {display_label(OBESITY_ORDER[-1])}, and the scatter forms visibly ordered bands. "
+        "This helps explain why body-size variables are highly predictive. Because obesity labels are closely related to body size and much of the dataset is synthetic, the separation should not be treated as evidence of broader causal relationships."
+    )
+
+    st.markdown("### 5. Lifestyle & dietary factor explorer")
+    cat_feature = st.selectbox(
+        "Select categorical factor",
+        CATEGORICAL_COLUMNS,
+        index=CATEGORICAL_COLUMNS.index("family_history_with_overweight"),
+        key="eda_categorical",
+    )
+    st.plotly_chart(plot_categorical_relationship(clean, cat_feature), use_container_width=True)
+    render_insight("Key pattern detected", categorical_insight(clean, cat_feature))
+
+    st.markdown("### 6. Relationship & correlation analysis")
+    corr_method = st.radio(
+        "Numerical correlation method",
+        ["Pearson", "Spearman"],
+        horizontal=True,
+        key="corr_method",
+    )
+    st.plotly_chart(plot_correlation_heatmap(clean, corr_method), use_container_width=True)
+
+    focus = st.selectbox(
+        "Focus correlation with",
+        NUMERICAL_COLUMNS,
+        index=NUMERICAL_COLUMNS.index("Weight"),
+        key="corr_focus",
+    )
+    corr = clean[NUMERICAL_COLUMNS].corr(method=corr_method.lower())[focus].drop(focus)
+    positives = corr[corr > 0].sort_values(ascending=False)
+    negatives = corr[corr < 0].sort_values()
+    weak = corr.reindex(corr.abs().sort_values().index)
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.markdown("**Strongest positive relationship**")
+        if not positives.empty:
+            st.metric(positives.index[0], f"r = {positives.iloc[0]:.3f}")
+        else:
+            st.write("No positive numerical relationship in this matrix.")
+    with c2:
+        st.markdown("**Strongest negative relationship**")
+        if not negatives.empty:
+            st.metric(negatives.index[0], f"r = {negatives.iloc[0]:.3f}")
+        else:
+            st.write("No negative numerical relationship in this matrix.")
+    with c3:
+        st.markdown("**Weakest relationship**")
+        if not weak.empty:
+            st.metric(weak.index[0], f"r = {weak.iloc[0]:.3f}")
+
+    st.info(
+        "The heatmap deliberately includes numerical predictors only. Categorical variables and the multiclass target are not assigned arbitrary integer codes and then interpreted with Pearson correlation. Correlation describes association and does not imply causation."
+    )
+
+    numeric_assoc, cat_assoc = target_association_tables(clean)
+    assoc_left, assoc_right = st.columns(2)
+    with assoc_left:
+        st.markdown("#### Numerical features vs obesity category")
+        st.caption("Eta-squared: descriptive share of numerical-feature variance occurring between obesity groups.")
+        st.dataframe(
+            numeric_assoc.style.format({"Eta-squared": "{:.3f}"}),
+            use_container_width=True,
+            hide_index=True,
+        )
+    with assoc_right:
+        st.markdown("#### Categorical features vs obesity category")
+        st.caption("Bias-corrected Cramér's V: categorical association measure from 0 to 1.")
+        st.dataframe(
+            cat_assoc.style.format({"Cramer's V": "{:.3f}"}),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    st.markdown("### 7. Key analytical insights")
+    for insight in key_analytical_insights(clean):
+        with st.expander(insight["Finding"], expanded=False):
+            st.markdown(f"**Evidence**  \n{insight['Evidence']}")
+            st.markdown(f"**Interpretation**  \n{insight['Interpretation']}")
+            st.markdown(f"**Potential practical relevance**  \n{insight['Practical Relevance']}")
+
+    st.markdown("### 8. From EDA to modelling")
+    comparison, artifacts, _ = build_comparison_dataframe()
+    links = []
+
+    # Data-side evidence
+    numeric_assoc_map = numeric_assoc.set_index("Numerical Feature")["Eta-squared"].to_dict()
+    cat_assoc_map = cat_assoc.set_index("Categorical Feature")["Cramer's V"].to_dict()
+
+    for model_name in ["Random Forest", "XGBoost"]:
+        artifact = artifacts.get(model_name)
+        if artifact is None:
+            continue
+        feature_df, _, _ = model_feature_analysis(model_name, artifact)
+        if feature_df is None:
+            continue
+        grouped = aggregate_feature_importance(feature_df)
+        top = grouped.head(5)["Original Feature"].tolist()
+        links.append((model_name, top))
+
+    if links:
+        for model_name, top_features in links:
+            st.markdown(f"**{model_name} — top original-feature signals from available model importance:** {', '.join(top_features)}")
+        render_insight(
+            "EDA observation → model evidence",
+            f"Weight has eta-squared {numeric_assoc_map.get('Weight', np.nan):.3f} against obesity category and is also prominent in tree-based model importance. "
+            f"Family history has Cramér's V {cat_assoc_map.get('family_history_with_overweight', np.nan):.3f}; it appears as a contributing feature rather than a causal explanation. "
+            f"FAF shows a descriptive decline toward Obesity Type III but lower standalone class separation (eta-squared {numeric_assoc_map.get('FAF', np.nan):.3f}), illustrating why multivariable models combine many weaker signals with stronger physical measurements."
+        )
+    else:
+        render_insight(
+            "EDA observation → model evidence",
+            "The EDA identifies strong body-size separation and meaningful lifestyle/categorical associations. Tree-based feature evidence will appear here when the saved model artifacts are available to Streamlit."
+        )
+
+
+
+def render_model_evaluation_page() -> None:
+    render_hero(
+        "Model Evaluation",
+        "Detailed evaluation of one saved model at a time, using the project's held-out test artifacts without retraining or changing probabilities.",
+    )
+
+    model_name = st.selectbox(
+        "Select model",
+        list(MODEL_REGISTRY.keys()),
+        key="model_eval_selector",
+    )
+
+    artifact, error = load_evaluation_artifact(model_name)
+    if artifact is None:
+        st.error(error)
+        expected = NOTEBOOK_TEST_RESULTS.get(model_name)
+        if expected:
+            st.info(
+                "The executed notebook reference values are available, but class-level/confusion/ROC views require the saved y_test, y_pred and y_pred_proba files."
+            )
+            st.dataframe(pd.DataFrame([{"Model": model_name, **expected}]), use_container_width=True, hide_index=True)
+        return
+
+    metrics = artifact["metrics"]
+    render_kpi_grid(
+        [
+            ("Accuracy", fmt_pct(metrics["Accuracy"]), "Held-out test set"),
+            ("Weighted Precision", f"{metrics['Precision']:.4f}", "Support-weighted across classes"),
+            ("Weighted Recall", f"{metrics['Recall']:.4f}", "Support-weighted across classes"),
+            ("Weighted F1", f"{metrics['Weighted F1']:.4f}", "Primary balanced comparison metric"),
+            ("Macro F1", f"{metrics['Macro F1']:.4f}", "Equal weight to all seven classes"),
+            ("Weighted OvR ROC-AUC", f"{metrics['ROC-AUC']:.4f}", "Probability discrimination"),
+        ],
+        columns_per_row=3,
+    )
+
+    if artifact["notebook_match"]:
+        st.success("Artifact integrity check: saved held-out metrics match the executed notebook reference values within rounding tolerance.")
+    else:
+        st.warning("Artifact/notebook mismatch detected: " + artifact["notebook_match_message"])
+
+    tabs = st.tabs(["Overview", "Confusion Matrix", "Class Performance", "ROC", "Feature Analysis"])
+
+    with tabs[0]:
+        info = MODEL_INFO[model_name]
+        left, right = st.columns([0.6, 0.4])
+        with left:
+            st.markdown(f"### {model_name}")
+            st.markdown(f"**Role:** {info['role']}")
+            st.markdown(f"**Model family:** {info['family']}")
+            st.markdown(f"**Configuration:** {info['configuration']}")
+            st.markdown(f"**Strength:** {info['strength']}")
+            st.markdown(f"**Limitation:** {info['limitation']}")
+        with right:
+            st.metric("Misclassified test cases", f"{metrics['Errors']} / {metrics['Test Size']}")
+            st.metric("Error rate", fmt_pct(metrics["Errors"] / metrics["Test Size"]))
+            cv = NOTEBOOK_CV_RESULTS[model_name]
+            st.metric("CV accuracy", f"{cv['CV Accuracy']:.4f} ± {cv['CV Accuracy Std']:.4f}")
+            st.caption("CV values are taken from the executed notebook unless data/cv_results.csv is provided.")
+
+    with tabs[1]:
+        mode = st.radio("View mode", ["Count", "Percentage"], horizontal=True, key=f"cm_mode_{model_name}")
+        st.plotly_chart(plot_confusion_matrix(artifact, mode), use_container_width=True)
+        details = confusion_details(artifact)
+        pair = details["pair"]
+        pair_text = (
+            f"{display_label(pair[0])} ↔ {display_label(pair[1])} ({details['pair_count']} combined errors)"
+            if pair else "Unavailable"
+        )
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Best-classified category", display_label(details["best_class"]), f"Recall {details['best_recall']:.1%}")
+        c2.metric("Hardest category", display_label(details["hardest_class"]), f"Recall {details['hardest_recall']:.1%}")
+        c3.metric("Most frequent confusion pair", pair_text)
+        adjacency = "neighbouring" if details["pair_adjacent"] else "non-neighbouring"
+        render_insight(
+            "Misclassification interpretation",
+            f"The most frequent two-way confusion pair is {pair_text}. These are {adjacency} categories in the natural obesity progression. Concentration of errors among adjacent classes is analytically plausible because boundary categories overlap more than extreme categories in the feature space."
+        )
+
+    with tabs[2]:
+        class_df = class_performance_dataframe(artifact)
+        st.plotly_chart(plot_class_performance(class_df), use_container_width=True)
+        st.dataframe(
+            class_df[["Obesity Category", "Precision", "Recall", "F1", "Support"]].style.format(
+                {"Precision": "{:.3f}", "Recall": "{:.3f}", "F1": "{:.3f}"}
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
+        strongest = class_df.loc[class_df["F1"].idxmax()]
+        weakest = class_df.loc[class_df["F1"].idxmin()]
+        render_insight(
+            "Class-level performance",
+            f"The strongest class by F1 is {strongest['Obesity Category']} ({strongest['F1']:.3f}); the weakest is {weakest['Obesity Category']} ({weakest['F1']:.3f}). This shows why a single aggregate accuracy value is not sufficient for evaluating a seven-class model."
+        )
+
+    with tabs[3]:
+        try:
+            roc_details = compute_roc_details(artifact)
+            roc_tab1, roc_tab2 = st.tabs(["Per-class ROC", "Micro / Macro ROC"])
+            with roc_tab1:
+                st.plotly_chart(plot_roc_classes(roc_details), use_container_width=True)
+                auc_table = pd.DataFrame(
+                    {
+                        "Obesity Category": [display_label(c) for c in OBESITY_ORDER],
+                        "Class AUC": [roc_details["class_auc"].get(c, np.nan) for c in OBESITY_ORDER],
+                    }
+                )
+                st.dataframe(
+                    auc_table.style.format({"Class AUC": "{:.4f}"}),
+                    use_container_width=True,
+                    hide_index=True,
+                )
+            with roc_tab2:
+                st.plotly_chart(plot_roc_averages(roc_details), use_container_width=True)
+            st.info(
+                "ROC probability columns are aligned to each model's actual saved class order. XGBoost uses the fixed LabelEncoder order from the executed notebook; the chart then reorders labels only for presentation. The random baseline is shown at AUC 0.5."
+            )
+        except Exception as exc:
+            st.warning(f"ROC curves could not be generated safely from the saved probabilities: {exc}")
+
+    with tabs[4]:
+        feature_df, title, note = model_feature_analysis(model_name, artifact)
+        st.markdown(f"### {title}")
+        st.write(note)
+        if feature_df is None:
+            st.info("No supported feature-analysis data is available for this model.")
+        else:
+            st.plotly_chart(plot_feature_analysis(feature_df, title), use_container_width=True)
+            st.dataframe(
+                feature_df.style.format({"Importance": "{:.5f}"}),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+
+
+def render_model_comparison_page() -> None:
+    render_hero(
+        "Model Comparison & Selection",
+        "Evidence-based comparison across four models using held-out performance, cross-validation stability, class errors, interpretability and deployment considerations.",
+    )
+
+    comparison, artifacts, warnings = build_comparison_dataframe()
+    if comparison.empty:
+        st.error("No saved model metrics or executed-notebook reference values are available.")
+        return
+
+    if warnings:
+        with st.expander("Artifact availability / consistency notices", expanded=False):
+            for warning in warnings:
+                st.write("• " + warning)
+
+    ranking_metric = st.selectbox(
+        "Rank models by",
+        ["Weighted F1", "Macro F1", "Accuracy", "ROC-AUC"],
+        index=0,
+        key="ranking_metric",
+    )
+    ranked = comparison.sort_values(ranking_metric, ascending=False).reset_index(drop=True).copy()
+    ranked["Rank"] = np.arange(1, len(ranked) + 1)
+
+    st.markdown("### Model ranking table")
+    ranking_display = ranked[
         [
             "Rank",
             "Model",
             "Accuracy",
-            "Precision",
-            "Recall",
-            "F1 Score",
+            "Weighted F1",
             "Macro F1",
             "ROC-AUC",
             "Errors",
-            "Error Rate",
-        ]
-    ].copy()
-
-    summary_display.columns = [
-        "Rank",
-        "Model",
-        "Accuracy",
-        "Precision",
-        "Recall",
-        "Weighted F1",
-        "Macro F1",
-        "ROC-AUC (Weighted, OvR)",
-        "Errors",
-        "Error Rate",
-    ]
-
-    st.dataframe(
-        summary_display.style.format({
-            "Accuracy": "{:.2%}",
-            "Precision": "{:.4f}",
-            "Recall": "{:.4f}",
-            "Weighted F1": "{:.4f}",
-            "Macro F1": "{:.4f}",
-            "ROC-AUC (Weighted, OvR)": "{:.4f}",
-            "Error Rate": "{:.2%}",
-        }),
-        use_container_width=True,
-        hide_index=True,
-    )
-
-    # --------------------------------------------------------
-    # 3. CROSS-VALIDATION STABILITY
-    # --------------------------------------------------------
-    st.markdown("### 2. Cross-Validation Performance")
-
-    st.caption(
-        "Five-fold cross-validation on the training data shows whether "
-        "performance is consistent across different training folds."
-    )
-
-    cv_display = comparison_df[
-        [
-            "Model",
             "CV Accuracy",
             "CV Accuracy Std",
             "CV F1",
             "CV F1 Std",
-            "Accuracy",
-            "F1 Score",
+            "Metric Source",
         ]
     ].copy()
-
-    cv_display.columns = [
-        "Model",
-        "CV Accuracy",
-        "CV Accuracy SD",
-        "CV Weighted F1",
-        "CV F1 SD",
-        "Test Accuracy",
-        "Test Weighted F1",
-    ]
-
     st.dataframe(
-        cv_display.style.format({
-            "CV Accuracy": "{:.2%}",
-            "CV Accuracy SD": "{:.4f}",
-            "CV Weighted F1": "{:.4f}",
-            "CV F1 SD": "{:.4f}",
-            "Test Accuracy": "{:.2%}",
-            "Test Weighted F1": "{:.4f}",
-        }),
+        ranking_display.style.format(
+            {
+                "Accuracy": "{:.4f}",
+                "Weighted F1": "{:.4f}",
+                "Macro F1": "{:.4f}",
+                "ROC-AUC": "{:.4f}",
+                "CV Accuracy": "{:.4f}",
+                "CV Accuracy Std": "{:.4f}",
+                "CV F1": "{:.4f}",
+                "CV F1 Std": "{:.4f}",
+            }
+        ),
         use_container_width=True,
         hide_index=True,
     )
-
-    cv_fig, cv_ax = plt.subplots(figsize=(10, 5))
-
-    x = np.arange(len(comparison_df))
-    width = 0.35
-
-    cv_ax.bar(
-        x - width / 2,
-        comparison_df["CV Accuracy"],
-        width,
-        label="5-Fold CV Accuracy",
+    st.caption(
+        "Default ranking uses Weighted F1 because it balances precision and recall while respecting class support. The final recommendation below does not rely on this single metric alone."
     )
 
-    cv_ax.bar(
-        x + width / 2,
-        comparison_df["Accuracy"],
-        width,
-        label="Test Accuracy",
+    st.markdown("### Performance comparison")
+    metric_cols = ["Accuracy", "Precision", "Recall", "Weighted F1"]
+    long = comparison.melt(id_vars="Model", value_vars=metric_cols, var_name="Metric", value_name="Score")
+    fig = px.bar(
+        long,
+        x="Model",
+        y="Score",
+        color="Metric",
+        barmode="group",
+        text_auto=".3f",
+        color_discrete_map={
+            "Accuracy": "#9FB3BA",
+            "Precision": "#6B7F93",
+            "Recall": "#3A8688",
+            "Weighted F1": "#1F5F75",
+        },
+        title="Held-out Test Performance Across Core Classification Metrics",
     )
+    fig.update_yaxes(range=[0, 1], title="Score")
+    fig.update_xaxes(title="")
+    st.plotly_chart(base_plot_layout(fig, 520), use_container_width=True)
+    st.info("ROC-AUC is intentionally not placed on this grouped bar axis; it answers a different discrimination question and is retained in the ranking table and model-evaluation ROC view.")
 
-    cv_ax.set_xticks(x)
-    cv_ax.set_xticklabels(comparison_df["Model"], rotation=15)
-    cv_ax.set_ylabel("Accuracy")
-    cv_ax.set_ylim(
-        0,
-        min(1.0, max(
-            comparison_df["CV Accuracy"].max(),
-            comparison_df["Accuracy"].max(),
-        ) * 1.12),
-    )
-    cv_ax.set_title(
-        "Cross-Validation vs Held-Out Test Accuracy",
-        fontweight="bold",
-    )
-    cv_ax.legend()
-    cv_ax.grid(axis="y", alpha=0.20)
-
-    plt.tight_layout()
-    st.pyplot(cv_fig, width="stretch")
-    plt.close(cv_fig)
-
-    # Cross-validation interpretation. The values below are the saved
-    # notebook results and are supporting evidence in this app-only version.
-    best_cv = comparison_df.sort_values(
-        "CV Accuracy",
-        ascending=False,
-    ).iloc[0]
-
-    most_stable = comparison_df.sort_values(
-        "CV Accuracy Std",
-        ascending=True,
-    ).iloc[0]
-
-    st.info(
-        f"**Cross-validation insight:** {best_cv['Model']} has the highest "
-        f"saved five-fold CV accuracy at **{best_cv['CV Accuracy']:.2%}**. "
-        f"The smallest reported CV accuracy SD is for "
-        f"**{most_stable['Model']}** at **{most_stable['CV Accuracy Std']:.4f}**. "
-        "Mean CV performance and fold-to-fold variability are interpreted separately."
-    )
-
-    # --------------------------------------------------------
-    # 4. CLASS-LEVEL PERFORMANCE
-    # --------------------------------------------------------
-    st.markdown("### 3. Class-Level Performance")
-
-    class_model = st.selectbox(
-        "Select a model for class-level analysis",
-        list(comparison_artifacts.keys()),
-        key="class_level_model",
-    )
-
-    class_artifact = comparison_artifacts[class_model]
-
-    report_dict = classification_report(
-        class_artifact["y_true"],
-        class_artifact["y_pred"],
-        labels=class_artifact["classes"],
-        output_dict=True,
-        zero_division=0,
-    )
-
-    class_rows = []
-
-    for class_name in class_artifact["classes"]:
-        if class_name in report_dict:
-            class_rows.append({
-                "Class": class_name,
-                "Precision": report_dict[class_name]["precision"],
-                "Recall": report_dict[class_name]["recall"],
-                "F1 Score": report_dict[class_name]["f1-score"],
-                "Support": int(report_dict[class_name]["support"]),
-            })
-
-    class_df = pd.DataFrame(class_rows)
-
-    if not class_df.empty:
-
-        st.dataframe(
-            class_df.style.format({
-                "Precision": "{:.3f}",
-                "Recall": "{:.3f}",
-                "F1 Score": "{:.3f}",
-            }),
-            use_container_width=True,
-            hide_index=True,
-        )
-
-        class_fig, class_ax = plt.subplots(figsize=(10, 5))
-
-        bars = class_ax.barh(
-            class_df["Class"],
-            class_df["F1 Score"],
-        )
-
-        for bar, value in zip(bars, class_df["F1 Score"]):
-            class_ax.text(
-                value + 0.005,
-                bar.get_y() + bar.get_height() / 2,
-                f"{value:.3f}",
-                va="center",
-                fontweight="bold",
+    st.markdown("### Cross-validation stability vs held-out test performance")
+    cv_fig = go.Figure()
+    for _, row in comparison.iterrows():
+        model_name = row["Model"]
+        cv_fig.add_trace(
+            go.Bar(
+                x=[model_name],
+                y=[row["CV Accuracy"]],
+                name="5-fold CV accuracy" if len(cv_fig.data) == 0 else None,
+                marker_color="#3A8688",
+                error_y=dict(type="data", array=[row["CV Accuracy Std"]], visible=True, color="#3A8688"),
+                showlegend=(len(cv_fig.data) == 0),
+                hovertemplate=f"{model_name}<br>CV accuracy: {row['CV Accuracy']:.4f}<br>SD: {row['CV Accuracy Std']:.4f}<extra></extra>",
             )
-
-        class_ax.set_xlim(
-            0,
-            min(1.0, max(class_df["F1 Score"]) * 1.12),
         )
-        class_ax.set_xlabel("F1 Score")
-        class_ax.set_title(
-            f"Per-Class F1 Score — {class_model}",
-            fontweight="bold",
-        )
-        class_ax.grid(axis="x", alpha=0.20)
-        class_ax.spines[["top", "right", "left"]].set_visible(False)
-
-        plt.tight_layout()
-        st.pyplot(class_fig, width="stretch")
-        plt.close(class_fig)
-
-        weakest = class_df.loc[class_df["F1 Score"].idxmin()]
-        strongest = class_df.loc[class_df["F1 Score"].idxmax()]
-
-        st.info(
-            f"**Class-level insight:** The strongest class for "
-            f"{class_model} is **{strongest['Class']}** "
-            f"(F1 = {strongest['F1 Score']:.3f}), while the weakest is "
-            f"**{weakest['Class']}** (F1 = {weakest['F1 Score']:.3f}). "
-            "This highlights which obesity categories are easier or harder "
-            "for the selected model to distinguish."
-        )
-
-    # --------------------------------------------------------
-    # Confusion matrix
-    # --------------------------------------------------------
-    st.markdown("#### Confusion Matrix")
-
-    cm = pd.crosstab(
-        pd.Series(
-            class_artifact["y_true"],
-            name="Actual",
-        ),
-        pd.Series(
-            class_artifact["y_pred"],
-            name="Predicted",
-        ),
-    )
-
-    cm = cm.reindex(
-        index=class_artifact["classes"],
-        columns=class_artifact["classes"],
-        fill_value=0,
-    )
-
-    cm_fig, cm_ax = plt.subplots(figsize=(10, 7))
-
-    sns.heatmap(
-        cm,
-        annot=True,
-        fmt="d",
-        cmap="Blues",
-        cbar=True,
-        ax=cm_ax,
-    )
-
-    cm_ax.set_title(
-        f"Confusion Matrix — {class_model}",
-        fontweight="bold",
-    )
-    cm_ax.set_xlabel("Predicted")
-    cm_ax.set_ylabel("Actual")
-    plt.xticks(rotation=45, ha="right")
-    plt.yticks(rotation=0)
-    plt.tight_layout()
-
-    st.pyplot(cm_fig, width="stretch")
-    plt.close(cm_fig)
-
-    # --------------------------------------------------------
-    # 5. MISCLASSIFICATION ANALYSIS
-    # --------------------------------------------------------
-    st.markdown("### 4. Misclassification Analysis")
-
-    mis_rows = []
-
-    for model_name, artifact in comparison_artifacts.items():
-
-        y_true = artifact["y_true"]
-        y_pred = artifact["y_pred"]
-
-        incorrect = y_true != y_pred
-        errors = int(incorrect.sum())
-        total = len(y_true)
-
-        mis_rows.append({
-            "Model": model_name,
-            "Misclassified": errors,
-            "Total": total,
-            "Error Rate": errors / total,
-        })
-
-    mis_df = pd.DataFrame(mis_rows).sort_values(
-        "Error Rate"
-    ).reset_index(drop=True)
-
-    mis_df["Rank"] = np.arange(1, len(mis_df) + 1)
-
-    mis_cols = st.columns(len(mis_df))
-
-    for col, (_, row) in zip(mis_cols, mis_df.iterrows()):
-        with col:
-            st.metric(
-                f"#{int(row['Rank'])} {row['Model']}",
-                f"{int(row['Misclassified'])} errors",
-                f"{row['Error Rate']:.2%}",
+        cv_fig.add_trace(
+            go.Bar(
+                x=[model_name],
+                y=[row["Accuracy"]],
+                name="Held-out test accuracy" if len(cv_fig.data) == 1 else None,
+                marker_color="#1F5F75",
+                showlegend=(len(cv_fig.data) == 1),
+                hovertemplate=f"{model_name}<br>Test accuracy: {row['Accuracy']:.4f}<extra></extra>",
             )
-
-    mis_fig, mis_ax = plt.subplots(figsize=(10, 5))
-
-    bars = mis_ax.barh(
-        mis_df["Model"],
-        mis_df["Error Rate"],
-    )
-
-    for bar, value in zip(bars, mis_df["Error Rate"]):
-        mis_ax.text(
-            value + 0.002,
-            bar.get_y() + bar.get_height() / 2,
-            f"{value:.2%}",
-            va="center",
-            fontweight="bold",
         )
-
-    mis_ax.set_xlabel("Misclassification Rate")
-    mis_ax.set_title(
-        "Misclassification Rate — Lower is Better",
-        fontweight="bold",
+    cv_fig.update_layout(
+        barmode="group",
+        title="Cross-Validation Accuracy (Mean ± 1 SD) vs Held-out Test Accuracy",
+        xaxis_title="",
+        yaxis_title="Accuracy",
     )
-    mis_ax.grid(axis="x", alpha=0.20)
-    mis_ax.spines[["top", "right", "left"]].set_visible(False)
+    cv_fig.update_yaxes(range=[0, 1])
+    st.plotly_chart(base_plot_layout(cv_fig, 520), use_container_width=True)
 
-    plt.tight_layout()
-    st.pyplot(mis_fig, width="stretch")
-    plt.close(mis_fig)
-
-    selected_mis_model = st.selectbox(
-        "Inspect the most common errors",
-        list(comparison_artifacts.keys()),
-        key="selected_misclassification_model",
+    stability = comparison[["Model", "CV Accuracy", "CV Accuracy Std", "Accuracy"]].copy()
+    stability["Absolute CV–Test Gap"] = (stability["CV Accuracy"] - stability["Accuracy"]).abs()
+    stable_row = stability.sort_values("CV Accuracy Std").iloc[0]
+    close_row = stability.sort_values("Absolute CV–Test Gap").iloc[0]
+    render_insight(
+        "Generalisation evidence",
+        f"The smallest CV accuracy SD is {stable_row['CV Accuracy Std']:.4f} for {stable_row['Model']}. "
+        f"The closest CV mean to held-out test accuracy is {close_row['Model']} with an absolute gap of {close_row['Absolute CV–Test Gap']:.4f}. "
+        "Small fold-to-fold variation and similar CV/test performance provide stronger evidence of stability than test accuracy alone. Cross-validation is not an independent test set."
     )
+    st.caption("Random Forest note: its notebook prints ±2×SD. This dashboard displays the one-standard-deviation values (~0.0208 accuracy, ~0.0211 weighted F1) for consistency with the other models.")
 
-    selected_artifact = comparison_artifacts[selected_mis_model]
+    st.markdown("### Misclassification comparison")
+    error_df = comparison[["Model", "Errors", "Test Size"]].copy()
+    error_df["Error Rate"] = error_df["Errors"] / error_df["Test Size"]
+    err_fig = px.bar(
+        error_df.sort_values("Error Rate"),
+        x="Error Rate",
+        y="Model",
+        orientation="h",
+        color="Model",
+        color_discrete_map=MODEL_COLORS,
+        text=error_df.sort_values("Error Rate")["Error Rate"].map(lambda x: f"{x:.2%}"),
+        title="Held-out Misclassification Rate — Lower Is Better",
+    )
+    err_fig.update_xaxes(tickformat=".0%", title="Error rate")
+    err_fig.update_yaxes(title="")
+    err_fig.update_layout(showlegend=False)
+    st.plotly_chart(base_plot_layout(err_fig, 420), use_container_width=True)
 
-    error_df = pd.DataFrame({
-        "Actual": selected_artifact["y_true"],
-        "Predicted": selected_artifact["y_pred"],
-    })
-
-    error_df = error_df[
-        error_df["Actual"] != error_df["Predicted"]
-    ]
-
-    if not error_df.empty:
-
-        top_errors = (
-            error_df
-            .groupby(["Actual", "Predicted"])
-            .size()
-            .reset_index(name="Count")
-            .sort_values("Count", ascending=False)
-            .head(5)
+    if artifacts:
+        selected_error_model = st.selectbox(
+            "Inspect most common error pairs",
+            list(artifacts.keys()),
+            key="comparison_error_model",
         )
+        art = artifacts[selected_error_model]
+        error_pairs = pd.DataFrame({"Actual": art["y_true"], "Predicted": art["y_pred"]})
+        error_pairs = error_pairs[error_pairs["Actual"] != error_pairs["Predicted"]]
+        if not error_pairs.empty:
+            top = (
+                error_pairs.groupby(["Actual", "Predicted"]).size().reset_index(name="Count")
+                .sort_values("Count", ascending=False).head(6)
+            )
+            top["Actual"] = top["Actual"].map(display_label)
+            top["Predicted"] = top["Predicted"].map(display_label)
+            st.dataframe(top, use_container_width=True, hide_index=True)
 
-        top_errors["Misclassification"] = (
-            top_errors["Actual"].astype(str)
-            + " → "
-            + top_errors["Predicted"].astype(str)
-        )
-
-        top_errors = top_errors[
-            ["Misclassification", "Count"]
+    st.markdown("### Strengths, limitations and deployment trade-offs")
+    tradeoff_df = pd.DataFrame(
+        [
+            {
+                "Model": name,
+                "Strength": MODEL_INFO[name]["strength"],
+                "Limitation": MODEL_INFO[name]["limitation"],
+                "Interpretability": MODEL_INFO[name]["interpretability"],
+                "Operational Complexity": MODEL_INFO[name]["operational_complexity"],
+            }
+            for name in MODEL_REGISTRY
         ]
-
-        st.dataframe(
-            top_errors,
-            use_container_width=True,
-            hide_index=True,
-        )
-
-        total_errors = len(error_df)
-        total_cases = len(selected_artifact["y_true"])
-
-        st.caption(
-            f"{selected_mis_model} made **{total_errors} errors out of "
-            f"{total_cases} test cases ({total_errors / total_cases:.2%})**."
-        )
-
-    # --------------------------------------------------------
-    # Analytical interpretation
-    # --------------------------------------------------------
-    st.markdown("#### What the misclassifications tell us")
-
-    best_error_row = mis_df.iloc[0]
-    worst_error_row = mis_df.iloc[-1]
-    error_difference = (
-        int(worst_error_row["Misclassified"])
-        - int(best_error_row["Misclassified"])
     )
+    st.dataframe(tradeoff_df, use_container_width=True, hide_index=True)
 
-    st.info(
-        f"**Misclassification insight:** {best_error_row['Model']} makes the "
-        f"fewest errors ({int(best_error_row['Misclassified'])}) on the shared "
-        f"held-out test set, which is {error_difference} fewer than "
-        f"{worst_error_row['Model']} "
-        f"({int(worst_error_row['Misclassified'])})."
-    )
-
-    # --------------------------------------------------------
-    # 6. MODEL STRENGTHS AND WEAKNESSES
-    # --------------------------------------------------------
-    st.markdown("### 5. Model Strengths and Weaknesses")
-
-    strengths = {
-        "Logistic Regression": (
-            "Simple, interpretable and computationally efficient baseline.",
-            "Its linear decision structure may be less suitable for complex nonlinear relationships."
-        ),
-        "K-Nearest Neighbours (KNN)": (
-            "Can capture local neighbourhood patterns without assuming a linear decision boundary.",
-            "Sensitive to feature scaling and distance definitions, and prediction cost grows with the training set."
-        ),
-        "Random Forest": (
-            "Captures nonlinear relationships and feature interactions while providing feature-importance estimates.",
-            "Less directly interpretable than Logistic Regression and can be computationally heavier with many trees."
-        ),
-        "XGBoost": (
-            "Boosted trees can model complex nonlinear patterns and interactions by sequentially correcting errors.",
-            "Requires careful tuning and is less directly interpretable than a linear baseline."
-        ),
-    }
-
-    strength_df = pd.DataFrame([
-        {
-            "Model": name,
-            "Strength": strengths[name][0],
-            "Limitation": strengths[name][1],
-        }
-        for name in comparison_df["Model"]
-        if name in strengths
-    ])
-
-    st.dataframe(
-        strength_df,
-        use_container_width=True,
-        hide_index=True,
-    )
-
-    # --------------------------------------------------------
-    # Final model selection
-    # --------------------------------------------------------
-    st.markdown("### Final Model Selection")
+    st.markdown("### Final model recommendation")
+    primary = comparison.sort_values("Weighted F1", ascending=False).iloc[0]
+    accuracy_leader = comparison.sort_values("Accuracy", ascending=False).iloc[0]["Model"]
+    macro_leader = comparison.sort_values("Macro F1", ascending=False).iloc[0]["Model"]
+    auc_leader = comparison.sort_values("ROC-AUC", ascending=False).iloc[0]["Model"]
+    error_leader = comparison.sort_values("Errors", ascending=True).iloc[0]["Model"]
+    cv_leader = comparison.sort_values("CV F1", ascending=False).iloc[0]["Model"]
+    leaders = [accuracy_leader, macro_leader, auc_leader, error_leader, cv_leader]
+    support_count = sum(name == primary["Model"] for name in leaders)
 
     st.success(
-        f"""
-        **Selected model: {winner["Model"]}**
-
-        The final model is selected primarily based on held-out weighted
-        F1-score, with accuracy, macro F1-score, weighted One-vs-Rest ROC-AUC
-        and misclassification count used as supporting evaluation measures.
-
-        On the shared held-out test set, **{winner["Model"]}** achieved an
-        accuracy of **{winner["Accuracy"]:.2%}**, weighted F1-score of
-        **{winner["F1 Score"]:.4f}**, macro F1-score of
-        **{winner["Macro F1"]:.4f}**, and weighted ROC-AUC of
-        **{winner["ROC-AUC"]:.4f}**. It produced **{int(winner["Errors"])}**
-        errors out of **{int(winner["Test Size"])}** test observations.
-
-        Based on the available saved model artifacts and held-out test results,
-        **{winner["Model"]}** is recommended as the final model for the
-        obesity-level classification prototype.
-        """
+        f"**Recommended final model: {primary['Model']}**\n\n"
+        f"Predictive performance: weighted F1 = **{primary['Weighted F1']:.4f}**, macro F1 = **{primary['Macro F1']:.4f}**, "
+        f"accuracy = **{primary['Accuracy']:.2%}**, weighted OvR ROC-AUC = **{primary['ROC-AUC']:.4f}**, and "
+        f"**{int(primary['Errors'])}** errors on {int(primary['Test Size'])} held-out cases. The same model also leads "
+        f"**{support_count}/5** supporting checks covering accuracy, macro F1, ROC-AUC, lowest errors and CV weighted F1."
     )
 
-    # --------------------------------------------------------
-    # Limitations and future improvements
-    # --------------------------------------------------------
-    with st.expander("Limitations and Future Improvements"):
+    info = MODEL_INFO[primary["Model"]]
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        render_insight("Predictive performance", "Selected primarily by weighted F1, then supported by accuracy, macro F1, ROC-AUC, CV performance and error analysis rather than a synthetic overall score.")
+    with c2:
+        render_insight("Interpretability", f"{primary['Model']} interpretability is rated {info['interpretability']}. Feature analysis helps explain associations, but it is less transparent than Logistic Regression.")
+    with c3:
+        render_insight("Operational complexity", f"{primary['Model']} operational complexity is {info['operational_complexity']}. The current saved artifact is still practical for a Streamlit academic prototype.")
 
-        st.markdown(
-            """
-            **Limitations**
-
-            - Evaluation is based on the available dataset and a single
-              held-out test split.
-            - Similar neighbouring obesity categories can overlap in feature
-              space, which can lead to confusion between adjacent classes.
-            - High predictive performance on this dataset does not guarantee
-              identical performance on a different population or external dataset.
-            - Feature importance should be interpreted as model association,
-              not as proof of causal relationships.
-
-            **Future Improvements**
-
-            - Validate the selected model on an independent external dataset.
-            - Investigate the weakest-performing classes in greater detail.
-            - Perform additional hyperparameter optimisation where appropriate.
-            - Apply explainable-AI methods such as SHAP to improve model
-              interpretability.
-            - Monitor model performance after deployment.
-            """
-        )
-
-    # --------------------------------------------------------
-    # Detailed metric differences
-    # --------------------------------------------------------
-    with st.expander("View Detailed Metric Differences"):
-
-        detail_metric = st.selectbox(
-            "Select metric",
-            [
-                "Accuracy",
-                "Precision",
-                "Recall",
-                "F1 Score",
-                "Macro F1",
-                "ROC-AUC",
-            ],
-            key="detail_metric_high_mark",
-        )
-
-        detail_df = comparison_df[
-            ["Rank", "Model", detail_metric]
-        ].copy()
-
-        best_value = comparison_df[detail_metric].max()
-
-        detail_df["Gap from Best"] = (
-            best_value - detail_df[detail_metric]
-        )
-
-        st.dataframe(
-            detail_df.style.format({
-                detail_metric: "{:.4f}",
-                "Gap from Best": "{:.4f}",
-            }),
-            use_container_width=True,
-            hide_index=True,
+    if primary["Model"] == "XGBoost":
+        st.info(
+            "For the current executed project results, XGBoost is not selected because of one isolated number: it leads weighted F1, test accuracy, macro F1, weighted ROC-AUC, CV weighted F1 and error count. Its main trade-off is lower intrinsic interpretability and greater deployment/version sensitivity."
         )
 
 
-# ============================================================
-# FOOTER
-# ============================================================
+
+def render_prediction_page() -> None:
+    render_hero(
+        "Individual Prediction Prototype",
+        "Enter one profile, choose a saved model, and inspect the predicted obesity category and full class-probability distribution. This is an academic classification demonstration, not a medical diagnosis.",
+    )
+
+    available_models = [name for name, cfg in MODEL_REGISTRY.items() if Path(cfg["model_path"]).exists()]
+    if not available_models:
+        st.error("No required model files were found in models/.")
+        return
+
+    model_name = st.selectbox("Prediction model", available_models, key="prediction_model")
+
+    with st.form("prediction_form"):
+        demo_tab, physical_tab, eating_tab, lifestyle_tab = st.tabs(
+            ["Demographics", "Physical Measures", "Eating Habits", "Lifestyle"]
+        )
+
+        with demo_tab:
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                gender = st.selectbox("Gender", ["Female", "Male"])
+            with c2:
+                age = st.number_input("Age (years)", min_value=14.0, max_value=61.0, value=25.0, step=1.0)
+            with c3:
+                family_history = st.selectbox("Family history of overweight", ["no", "yes"])
+
+        with physical_tab:
+            c1, c2 = st.columns(2)
+            with c1:
+                height = st.number_input("Height (m)", min_value=1.45, max_value=1.98, value=1.70, step=0.01, format="%.2f")
+            with c2:
+                weight = st.number_input("Weight (kg)", min_value=39.0, max_value=173.0, value=70.0, step=0.5, format="%.1f")
+            bmi = weight / (height ** 2)
+            st.caption(f"BMI for reference only: **{bmi:.2f}**. BMI is not added to the trained model inputs.")
+
+        with eating_tab:
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                favc = st.selectbox("Frequent high-calorie food (FAVC)", ["no", "yes"])
+                fcvc = st.slider("Vegetable consumption (FCVC, 1–3)", 1.0, 3.0, 2.0, 0.1)
+                ncp = st.slider("Main meals (NCP, 1–4)", 1.0, 4.0, 3.0, 0.1)
+            with c2:
+                caec = st.selectbox("Eating between meals (CAEC)", ["no", "Sometimes", "Frequently", "Always"])
+                ch2o = st.slider("Water consumption (CH2O, 1–3)", 1.0, 3.0, 2.0, 0.1)
+                scc = st.selectbox("Calorie-consumption monitoring (SCC)", ["no", "yes"])
+            with c3:
+                calc = st.selectbox("Alcohol consumption (CALC)", ["no", "Sometimes", "Frequently", "Always"])
+
+        with lifestyle_tab:
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                smoke = st.selectbox("Smoking status", ["no", "yes"])
+            with c2:
+                faf = st.slider("Physical activity frequency (FAF, 0–3)", 0.0, 3.0, 1.0, 0.1)
+                tue = st.slider("Technology-use frequency (TUE, 0–2)", 0.0, 2.0, 1.0, 0.1)
+            with c3:
+                mtrans = st.selectbox(
+                    "Transportation (MTRANS)",
+                    ["Automobile", "Motorbike", "Bike", "Public_Transportation", "Walking"],
+                )
+
+        submitted = st.form_submit_button("Run classification", use_container_width=True)
+
+    if submitted:
+        values = {
+            "Gender": gender,
+            "Age": age,
+            "Height": height,
+            "Weight": weight,
+            "family_history_with_overweight": family_history,
+            "FAVC": favc,
+            "FCVC": fcvc,
+            "NCP": ncp,
+            "CAEC": caec,
+            "SMOKE": smoke,
+            "CH2O": ch2o,
+            "SCC": scc,
+            "FAF": faf,
+            "TUE": tue,
+            "CALC": calc,
+            "MTRANS": mtrans,
+        }
+        try:
+            result = make_prediction(model_name, values)
+            result["BMI"] = bmi
+            result["inputs"] = values
+            st.session_state["prediction_result"] = result
+        except Exception as exc:
+            st.error(f"Prediction could not be completed safely: {exc}")
+
+    result = st.session_state.get("prediction_result")
+    if result is None:
+        st.info("Complete the form and click **Run classification** to display a prediction.")
+        return
+
+    st.markdown("### Prediction result")
+    render_kpi_grid(
+        [
+            ("Predicted Obesity Level", display_label(result["prediction"]), "Highest predicted probability"),
+            ("Prediction Confidence", fmt_pct(result["confidence"]), "Maximum class probability"),
+            ("BMI (Reference)", f"{result['BMI']:.2f}", "Not an input feature added by this app"),
+            ("Selected Model", result["model"], "Saved trained artifact"),
+        ]
+    )
+
+    proba_df = pd.DataFrame(
+        {
+            "Class": result["classes"].astype(str),
+            "Probability": result["probabilities"],
+        }
+    )
+    proba_df["Obesity Category"] = proba_df["Class"].map(display_label)
+    proba_df["Color"] = proba_df["Class"].map(OBESITY_COLORS)
+    proba_df = proba_df.sort_values("Probability", ascending=True)
+
+    fig = go.Figure(
+        go.Bar(
+            x=proba_df["Probability"],
+            y=proba_df["Obesity Category"],
+            orientation="h",
+            marker_color=proba_df["Color"],
+            text=[f"{p:.1%}" for p in proba_df["Probability"]],
+            textposition="outside",
+            hovertemplate="%{y}<br>Probability: %{x:.2%}<extra></extra>",
+        )
+    )
+    fig.update_layout(title="Predicted Probability Across All Seven Classes", xaxis_title="Predicted probability", yaxis_title="")
+    fig.update_xaxes(range=[0, max(1.0, float(proba_df["Probability"].max()) * 1.12)], tickformat=".0%")
+    st.plotly_chart(base_plot_layout(fig, 500), use_container_width=True)
+
+    st.warning(
+        "This prototype demonstrates machine-learning classification for academic purposes and should not be treated as a medical diagnosis or medical recommendation."
+    )
+
+    with st.expander("View submitted input summary"):
+        summary = pd.DataFrame(
+            [{"Feature": k, "Value": humanize_category(v) if isinstance(v, str) else v} for k, v in result["inputs"].items()]
+        )
+        st.dataframe(summary, use_container_width=True, hide_index=True)
+
+
+# =============================================================================
+# SIDEBAR / APP ROUTING
+# =============================================================================
+
+st.sidebar.markdown("## Obesity Analytics")
+st.sidebar.caption("BMDS2003 · CRISP-DM analytical prototype")
+
+page = st.sidebar.radio(
+    "Navigation",
+    [
+        "🏠 Overview",
+        "🧹 Data Preparation",
+        "🔍 Exploratory Analysis",
+        "🤖 Model Evaluation",
+        "🏆 Model Comparison",
+        "🔮 Prediction",
+    ],
+    label_visibility="collapsed",
+)
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("**Integrity safeguards**")
+st.sidebar.caption(
+    "• No model training or tuning\n"
+    "• No change to saved split\n"
+    "• No change to One-Hot Encoding schema\n"
+    "• No change to XGBoost class mapping\n"
+    "• Evaluation uses saved predictions/probabilities"
+)
+
+st.sidebar.markdown("---")
+status_model_files = sum(Path(cfg["model_path"]).exists() for cfg in MODEL_REGISTRY.values())
+st.sidebar.caption(f"Model files detected: {status_model_files}/4")
+st.sidebar.caption(f"Shared test artifact: {'Ready' if Path(X_TEST_PATH).exists() and Path(Y_TEST_PATH).exists() else 'Missing'}")
+
+raw, clean, dataset_path = get_data()
+
+if page == "🏠 Overview":
+    if raw is not None and clean is not None:
+        render_overview_page(raw, clean)
+elif page == "🧹 Data Preparation":
+    if raw is not None and clean is not None:
+        render_data_preparation_page(raw, clean)
+elif page == "🔍 Exploratory Analysis":
+    if raw is not None and clean is not None:
+        render_eda_page(raw, clean)
+elif page == "🤖 Model Evaluation":
+    render_model_evaluation_page()
+elif page == "🏆 Model Comparison":
+    render_model_comparison_page()
+elif page == "🔮 Prediction":
+    render_prediction_page()
 
 st.markdown("---")
-st.caption("Obesity Levels dataset — UCI Machine Learning Repository")
+st.caption(
+    "BMDS2003 Data Science · Obesity Levels dataset · Analytical prototype. "
+    "EDA-derived BMI/AgeGroup are for interpretation only and are not added to the trained model feature space."
+)
