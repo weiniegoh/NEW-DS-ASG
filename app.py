@@ -2761,16 +2761,6 @@ page = st.sidebar.radio(
 )
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("**Integrity safeguards**")
-st.sidebar.caption(
-    "• No model training or tuning\n"
-    "• No change to saved split\n"
-    "• No change to One-Hot Encoding schema\n"
-    "• No change to XGBoost class mapping\n"
-    "• Evaluation uses saved predictions/probabilities"
-)
-
-st.sidebar.markdown("---")
 status_model_files = sum(Path(cfg["model_path"]).exists() for cfg in MODEL_REGISTRY.values())
 st.sidebar.caption(f"Model files detected: {status_model_files}/4")
 st.sidebar.caption(f"Shared test artifact: {'Ready' if Path(X_TEST_PATH).exists() and Path(Y_TEST_PATH).exists() else 'Missing'}")
