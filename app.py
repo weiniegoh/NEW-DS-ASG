@@ -1293,6 +1293,39 @@ else:
         hide_index=True, 
     ) 
 
+    # -------------------------------------------------------- 
+    # Best / weakest class for every model — Colab comparison feature 
+    # -------------------------------------------------------- 
+    st.markdown("#### Best and Weakest Class Across Models") 
+
+    class_summary_rows = [] 
+    for model_name, artifact in comparison_artifacts.items(): 
+        report = classification_report( 
+            artifact["y_true"], artifact["y_pred"], 
+            labels=artifact["classes"], output_dict=True, zero_division=0 
+        ) 
+        per_class = pd.DataFrame(report).T.reindex(artifact["classes"]).dropna(subset=["f1-score"]) 
+        if not per_class.empty: 
+            best_class = per_class["f1-score"].idxmax() 
+            worst_class = per_class["f1-score"].idxmin() 
+            class_summary_rows.append({ 
+                "Model": model_name, 
+                "Best Class": best_class, 
+                "Best F1": per_class.loc[best_class, "f1-score"], 
+                "Weakest Class": worst_class, 
+                "Weakest F1": per_class.loc[worst_class, "f1-score"], 
+            }) 
+
+    class_summary_all_df = pd.DataFrame(class_summary_rows) 
+    if not class_summary_all_df.empty: 
+        st.dataframe( 
+            class_summary_all_df.style.format({"Best F1": "{:.3f}", "Weakest F1": "{:.3f}"}), 
+            use_container_width=True, hide_index=True 
+        ) 
+
+    # -------------------------------------------------------- 
+    # Confusion matrix 
+
     # Colab comparison exports these three result tables. 
     st.markdown("#### Download Comparison Results") 
     download_col1, download_col2, download_col3 = st.columns(3) 
@@ -1513,38 +1546,6 @@ else:
             "for the selected model to distinguish." 
         ) 
 
-    # -------------------------------------------------------- 
-    # Best / weakest class for every model — Colab comparison feature 
-    # -------------------------------------------------------- 
-    st.markdown("#### Best and Weakest Class Across Models") 
-
-    class_summary_rows = [] 
-    for model_name, artifact in comparison_artifacts.items(): 
-        report = classification_report( 
-            artifact["y_true"], artifact["y_pred"], 
-            labels=artifact["classes"], output_dict=True, zero_division=0 
-        ) 
-        per_class = pd.DataFrame(report).T.reindex(artifact["classes"]).dropna(subset=["f1-score"]) 
-        if not per_class.empty: 
-            best_class = per_class["f1-score"].idxmax() 
-            worst_class = per_class["f1-score"].idxmin() 
-            class_summary_rows.append({ 
-                "Model": model_name, 
-                "Best Class": best_class, 
-                "Best F1": per_class.loc[best_class, "f1-score"], 
-                "Weakest Class": worst_class, 
-                "Weakest F1": per_class.loc[worst_class, "f1-score"], 
-            }) 
-
-    class_summary_all_df = pd.DataFrame(class_summary_rows) 
-    if not class_summary_all_df.empty: 
-        st.dataframe( 
-            class_summary_all_df.style.format({"Best F1": "{:.3f}", "Weakest F1": "{:.3f}"}), 
-            use_container_width=True, hide_index=True 
-        ) 
-
-    # -------------------------------------------------------- 
-    # Confusion matrix 
     # -------------------------------------------------------- 
     st.markdown("#### Confusion Matrix") 
 
