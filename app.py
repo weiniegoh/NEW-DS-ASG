@@ -1,6 +1,12 @@
 """
 BMDS2003 Data Science — Obesity Risk Analytics & Classification Dashboard
 =========================================================================
+
+This Streamlit application is a presentation/analytics layer for the existing
+BMDS2003 project artifacts. It intentionally DOES NOT train or retune any model.
+
+Run with:
+    streamlit run app.py
 """
 
 from __future__ import annotations
