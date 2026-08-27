@@ -824,6 +824,36 @@ elif section == "Feature Importance":
     else: 
         st.info("Feature importance is not available for this model.") 
 
+    # Random Forest grouped feature-importance analysis from the Colab notebook. 
+    if selected_model_name == "Random Forest" and hasattr(model, "feature_importances_"): 
+        st.markdown("#### Feature Importance by Category") 
+        feature_groups = { 
+            "Physical": ["Weight", "Height"], 
+            "Demographic": ["Age", "Gender_Male"], 
+            "Dietary": ["FCVC", "NCP", "FAVC_yes", "CH2O"], 
+            "Lifestyle": ["FAF", "TUE", "SMOKE_yes", "SCC_yes"], 
+            "Family History": ["family_history_with_overweight_yes"], 
+            "Eating Habits": ["CAEC_Sometimes", "CAEC_Frequently", "CAEC_Always", "CAEC_no"], 
+            "Alcohol": ["CALC_Sometimes", "CALC_no", "CALC_Frequently", "CALC_Always"], 
+            "Transportation": ["MTRANS_Public_Transportation", "MTRANS_Walking", "MTRANS_Automobile", "MTRANS_Bike", "MTRANS_Motorbike"], 
+        } 
+        grouped_df = pd.DataFrame([ 
+            {"Feature Category": group, "Total Importance": float(importances[importances.index.isin(features)].sum())} 
+            for group, features in feature_groups.items() 
+        ]).sort_values("Total Importance", ascending=False).reset_index(drop=True) 
+
+        st.dataframe(grouped_df.style.format({"Total Importance": "{:.4f}"}), use_container_width=True, hide_index=True) 
+
+        grouped_fig, grouped_ax = plt.subplots(figsize=(10, 5)) 
+        grouped_plot = grouped_df.sort_values("Total Importance") 
+        grouped_ax.barh(grouped_plot["Feature Category"], grouped_plot["Total Importance"]) 
+        grouped_ax.set_xlabel("Total Importance") 
+        grouped_ax.set_title("Feature Importance by Category — Random Forest", fontweight="bold") 
+        grouped_ax.grid(axis="x", alpha=0.20) 
+        plt.tight_layout() 
+        st.pyplot(grouped_fig, width="stretch") 
+        plt.close(grouped_fig) 
+
 # ============================================================ 
 # ROC CURVES 
 # ============================================================ 
@@ -974,6 +1004,7 @@ def build_model_comparison():
                 "F1 Score": weighted_f1, 
                 "Macro F1": macro_f1, 
                 "ROC-AUC": roc_auc, 
+                "Overall Score": np.nan,  # calculated after all four models are collected
                 "Errors": errors, 
                 "Error Rate": error_rate, 
                 "Test Size": len(y_true), 
@@ -1006,21 +1037,21 @@ if comparison_df.empty:
 else: 
 
     # -------------------------------------------------------- 
-    # Model ranking 
+    # Model ranking — matches the Colab comparison notebook 
     # -------------------------------------------------------- 
-    # App-only approach: rank primarily by held-out weighted F1. 
-    # Accuracy and weighted OvR ROC-AUC act as tie-breakers/supporting metrics. 
+    # Overall Score = mean of Accuracy, Precision, Recall, Weighted F1 and ROC-AUC. 
+    comparison_df["Overall Score"] = comparison_df[ 
+        ["Accuracy", "Precision", "Recall", "F1 Score", "ROC-AUC"] 
+    ].mean(axis=1) 
+
     comparison_df = ( 
         comparison_df 
-        .sort_values( 
-            by=["F1 Score", "Accuracy", "ROC-AUC"], 
-            ascending=[False, False, False], 
-            na_position="last", 
-        ) 
+        .sort_values("Overall Score", ascending=False) 
         .reset_index(drop=True) 
     ) 
 
     comparison_df["Rank"] = np.arange(1, len(comparison_df) + 1) 
+
     winner = comparison_df.iloc[0] 
     shared_test_size = int(comparison_df["Test Size"].iloc[0]) 
 
@@ -1106,6 +1137,7 @@ else:
         ("Macro F1", winner["Macro F1"], "{:.4f}"), 
         ("Precision", winner["Precision"], "{:.4f}"), 
         ("ROC-AUC (W)", winner["ROC-AUC"], "{:.4f}"), 
+        ("Overall Score", winner["Overall Score"], "{:.4f}"), 
         ("Errors", winner["Errors"], "{:.0f}"), 
     ] 
 
@@ -1141,6 +1173,7 @@ else:
                     <div> 
                         <b>F1:</b> {row["F1 Score"]:.4f}<br> 
                         <b>ROC-AUC:</b> {row["ROC-AUC"]:.4f}<br> 
+                        <b>Overall Score:</b> {row["Overall Score"]:.4f}<br> 
                         <b>Errors:</b> {int(row["Errors"])} / {int(row["Test Size"])} 
                     </div> 
                 </div> 
@@ -1225,6 +1258,7 @@ else:
             "F1 Score", 
             "Macro F1", 
             "ROC-AUC", 
+            "Overall Score", 
             "Errors", 
             "Error Rate", 
         ] 
@@ -1239,6 +1273,7 @@ else:
         "Weighted F1", 
         "Macro F1", 
         "ROC-AUC (Weighted, OvR)", 
+        "Overall Score", 
         "Errors", 
         "Error Rate", 
     ] 
@@ -1251,11 +1286,36 @@ else:
             "Weighted F1": "{:.4f}", 
             "Macro F1": "{:.4f}", 
             "ROC-AUC (Weighted, OvR)": "{:.4f}", 
+            "Overall Score": "{:.4f}", 
             "Error Rate": "{:.2%}", 
         }), 
         use_container_width=True, 
         hide_index=True, 
     ) 
+
+    # Colab comparison exports these three result tables. 
+    st.markdown("#### Download Comparison Results") 
+    download_col1, download_col2, download_col3 = st.columns(3) 
+
+    with download_col1: 
+        st.download_button("Download Model Comparison CSV", comparison_df.to_csv(index=False).encode("utf-8"), 
+                           "model_comparison_summary.csv", "text/csv") 
+
+    with download_col2: 
+        class_f1_export = [] 
+        for model_name, artifact in comparison_artifacts.items(): 
+            report = classification_report(artifact["y_true"], artifact["y_pred"], 
+                                            labels=artifact["classes"], output_dict=True, zero_division=0) 
+            for class_name in artifact["classes"]: 
+                if class_name in report: 
+                    class_f1_export.append({"Class": class_name, "Model": model_name, 
+                                            "F1 Score": report[class_name]["f1-score"]}) 
+        st.download_button("Download Class F1 CSV", pd.DataFrame(class_f1_export).to_csv(index=False).encode("utf-8"), 
+                           "model_class_f1_comparison.csv", "text/csv") 
+
+    with download_col3: 
+        st.download_button("Download Class Summary CSV", class_summary_all_df.to_csv(index=False).encode("utf-8"), 
+                           "model_class_summary.csv", "text/csv") 
 
     # -------------------------------------------------------- 
     # 3. CROSS-VALIDATION STABILITY 
@@ -1451,6 +1511,36 @@ else:
             f"**{weakest['Class']}** (F1 = {weakest['F1 Score']:.3f}). " 
             "This highlights which obesity categories are easier or harder " 
             "for the selected model to distinguish." 
+        ) 
+
+    # -------------------------------------------------------- 
+    # Best / weakest class for every model — Colab comparison feature 
+    # -------------------------------------------------------- 
+    st.markdown("#### Best and Weakest Class Across Models") 
+
+    class_summary_rows = [] 
+    for model_name, artifact in comparison_artifacts.items(): 
+        report = classification_report( 
+            artifact["y_true"], artifact["y_pred"], 
+            labels=artifact["classes"], output_dict=True, zero_division=0 
+        ) 
+        per_class = pd.DataFrame(report).T.reindex(artifact["classes"]).dropna(subset=["f1-score"]) 
+        if not per_class.empty: 
+            best_class = per_class["f1-score"].idxmax() 
+            worst_class = per_class["f1-score"].idxmin() 
+            class_summary_rows.append({ 
+                "Model": model_name, 
+                "Best Class": best_class, 
+                "Best F1": per_class.loc[best_class, "f1-score"], 
+                "Weakest Class": worst_class, 
+                "Weakest F1": per_class.loc[worst_class, "f1-score"], 
+            }) 
+
+    class_summary_all_df = pd.DataFrame(class_summary_rows) 
+    if not class_summary_all_df.empty: 
+        st.dataframe( 
+            class_summary_all_df.style.format({"Best F1": "{:.3f}", "Weakest F1": "{:.3f}"}), 
+            use_container_width=True, hide_index=True 
         ) 
 
     # -------------------------------------------------------- 
