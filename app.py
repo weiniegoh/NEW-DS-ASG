@@ -346,74 +346,226 @@ MODEL_INFO = {
 # =============================================================================
 
 def inject_css() -> None:
+    """Theme-safe visual layer for both Streamlit Light and Dark mode."""
     st.markdown(
         """
         <style>
         :root {
-            --ink: #16303A;
-            --muted: #5D727A;
-            --panel: #FFFFFF;
-            --bg: #F4F8F9;
-            --line: #DDE8EA;
-            --teal: #2B7A78;
-            --teal-dark: #1F5F75;
-            --teal-soft: #E9F4F4;
-            --warning: #9A6700;
+            --app-primary: var(--primary-color, #2B7A78);
+            --app-bg: var(--background-color, #FFFFFF);
+            --app-secondary: var(--secondary-background-color, #F0F2F6);
+            --app-text: var(--text-color, #31333F);
+
+            --app-panel: var(--app-bg);
+            --app-panel-soft: rgba(127, 127, 127, 0.065);
+            --app-panel-hover: rgba(127, 127, 127, 0.10);
+            --app-border: rgba(127, 127, 127, 0.25);
+            --app-shadow: 0 6px 22px rgba(0, 0, 0, 0.08);
+
+            --ink: var(--app-text);
+            --muted: color-mix(in srgb, var(--app-text) 67%, var(--app-bg) 33%);
+            --panel: var(--app-panel);
+            --bg: var(--app-bg);
+            --line: var(--app-border);
+            --teal: var(--app-primary);
+            --teal-dark: color-mix(in srgb, var(--app-primary) 82%, var(--app-text) 18%);
+            --teal-soft: color-mix(in srgb, var(--app-primary) 12%, var(--app-bg) 88%);
+            --warning: #C58B16;
         }
 
-        .stApp { background: var(--bg); }
-        .block-container { max-width: 1450px; padding-top: 1.4rem; padding-bottom: 2rem; }
+        .stApp,
+        [data-testid="stAppViewContainer"] {
+            background:
+                radial-gradient(
+                    circle at 94% 4%,
+                    color-mix(in srgb, var(--app-primary) 7%, transparent),
+                    transparent 25rem
+                ),
+                radial-gradient(
+                    circle at 5% 22%,
+                    color-mix(in srgb, var(--app-primary) 4%, transparent),
+                    transparent 28rem
+                ),
+                var(--app-bg) !important;
+            color: var(--app-text);
+        }
 
-        h1, h2, h3 { color: var(--ink); letter-spacing: -0.02em; }
-        p, li { color: #31464F; }
+        .block-container {
+            max-width: 1450px;
+            padding-top: 1.4rem;
+            padding-bottom: 2rem;
+        }
 
-        [data-testid="stSidebar"] { background: #F9FCFC; border-right: 1px solid var(--line); }
-        [data-testid="stSidebar"] * { font-size: 0.96rem; }
+        h1, h2, h3, h4, h5, h6 {
+            color: var(--app-text) !important;
+            letter-spacing: -0.02em;
+        }
+
+        p, li {
+            color: var(--app-text);
+        }
+
+        [data-testid="stCaptionContainer"],
+        [data-testid="stCaptionContainer"] p,
+        .small-note {
+            color: var(--muted) !important;
+        }
+
+        [data-testid="stSidebar"] {
+            background: var(--app-secondary) !important;
+            border-right: 1px solid var(--app-border) !important;
+        }
+
+        [data-testid="stSidebar"] * {
+            font-size: 0.96rem;
+        }
+
+        [data-testid="stSidebar"] hr {
+            border-color: var(--app-border) !important;
+        }
+
+        [data-testid="stSidebar"] div[role="radiogroup"] label {
+            border-left: 3px solid transparent;
+            border-radius: 9px;
+            transition:
+                background-color 180ms ease,
+                border-color 180ms ease,
+                transform 180ms ease;
+        }
+
+        [data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+            background: color-mix(
+                in srgb,
+                var(--app-primary) 10%,
+                transparent
+            ) !important;
+            transform: translateX(2px);
+        }
+
+        [data-testid="stSidebar"]
+        div[role="radiogroup"]
+        label:has(input:checked) {
+            background: color-mix(
+                in srgb,
+                var(--app-primary) 14%,
+                transparent
+            ) !important;
+            border-left-color: var(--app-primary) !important;
+            font-weight: 700;
+        }
 
         .hero {
             padding: 28px 30px;
-            border: 1px solid var(--line);
+            border: 1px solid var(--app-border);
             border-radius: 18px;
-            background: linear-gradient(135deg, #FFFFFF 0%, #F0F8F8 100%);
+            background:
+                linear-gradient(
+                    135deg,
+                    var(--app-panel) 0%,
+                    color-mix(
+                        in srgb,
+                        var(--app-secondary) 78%,
+                        var(--app-panel) 22%
+                    ) 100%
+                );
+            box-shadow: var(--app-shadow);
             margin-bottom: 18px;
         }
-        .hero h1 { margin: 0 0 8px 0; font-size: 2.05rem; }
-        .hero p { margin: 0; color: var(--muted); font-size: 1.02rem; }
+
+        .hero h1 {
+            margin: 0 0 8px 0;
+            font-size: 2.05rem;
+            color: var(--app-text) !important;
+        }
+
+        .hero p {
+            margin: 0;
+            color: var(--muted) !important;
+            font-size: 1.02rem;
+        }
 
         .kpi-card {
-            background: var(--panel);
-            border: 1px solid var(--line);
+            background: var(--app-panel);
+            border: 1px solid var(--app-border);
             border-radius: 14px;
             padding: 16px 17px;
             min-height: 112px;
-            box-shadow: 0 2px 8px rgba(31, 95, 117, 0.04);
+            box-shadow: var(--app-shadow);
+            transition:
+                transform 180ms ease,
+                border-color 180ms ease,
+                background-color 180ms ease;
         }
-        .kpi-label { color: var(--muted); font-size: 0.82rem; margin-bottom: 6px; }
-        .kpi-value { color: var(--ink); font-size: 1.58rem; font-weight: 760; line-height: 1.15; }
-        .kpi-note { color: #71858C; font-size: 0.75rem; margin-top: 6px; }
+
+        .kpi-card:hover {
+            transform: translateY(-1px);
+            background: var(--app-panel-hover);
+            border-color: color-mix(
+                in srgb,
+                var(--app-primary) 45%,
+                var(--app-border) 55%
+            );
+        }
+
+        .kpi-label {
+            color: var(--muted);
+            font-size: 0.82rem;
+            margin-bottom: 6px;
+        }
+
+        .kpi-value {
+            color: var(--app-text);
+            font-size: 1.58rem;
+            font-weight: 760;
+            line-height: 1.15;
+        }
+
+        .kpi-note {
+            color: var(--muted);
+            font-size: 0.75rem;
+            margin-top: 6px;
+        }
 
         .insight-box {
-            background: #FFFFFF;
-            border: 1px solid var(--line);
-            border-left: 4px solid var(--teal);
+            background: var(--app-panel-soft);
+            border: 1px solid var(--app-border);
+            border-left: 4px solid var(--app-primary);
             border-radius: 10px;
             padding: 14px 16px;
             margin: 10px 0 14px 0;
         }
-        .insight-title { color: var(--ink); font-weight: 700; margin-bottom: 4px; }
-        .insight-body { color: #3B515A; line-height: 1.55; }
+
+        .insight-title {
+            color: var(--app-text);
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .insight-body {
+            color: var(--muted);
+            line-height: 1.55;
+        }
 
         .callout {
-            background: var(--teal-soft);
-            border: 1px solid #CFE3E4;
+            background: color-mix(
+                in srgb,
+                var(--app-primary) 11%,
+                var(--app-bg) 89%
+            );
+            border: 1px solid color-mix(
+                in srgb,
+                var(--app-primary) 30%,
+                var(--app-border) 70%
+            );
             border-radius: 12px;
             padding: 15px 17px;
             margin: 10px 0;
+            color: var(--app-text);
         }
 
         .flow-step {
-            background: #FFFFFF;
-            border: 1px solid var(--line);
+            background: var(--app-panel);
+            border: 1px solid var(--app-border);
             border-radius: 12px;
             padding: 14px 16px;
             margin: 8px 0;
@@ -421,24 +573,36 @@ def inject_css() -> None:
             gap: 14px;
             align-items: flex-start;
         }
+
         .flow-num {
             min-width: 32px;
             height: 32px;
             border-radius: 50%;
-            background: #D9EEEE;
-            color: #164A57;
+            background: color-mix(
+                in srgb,
+                var(--app-primary) 18%,
+                var(--app-bg) 82%
+            );
+            color: var(--app-primary);
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: 800;
         }
-        .flow-content b { color: var(--ink); }
-        .flow-content span { color: var(--muted); font-size: .92rem; }
+
+        .flow-content b {
+            color: var(--app-text);
+        }
+
+        .flow-content span {
+            color: var(--muted);
+            font-size: .92rem;
+        }
 
         .section-eyebrow {
             text-transform: uppercase;
             letter-spacing: .08em;
-            color: #4E787F;
+            color: var(--app-primary);
             font-size: .75rem;
             font-weight: 750;
             margin-bottom: 4px;
@@ -448,31 +612,127 @@ def inject_css() -> None:
             display: inline-block;
             padding: 5px 9px;
             border-radius: 999px;
-            border: 1px solid var(--line);
-            background: #FFFFFF;
+            border: 1px solid var(--app-border);
+            background: var(--app-panel-soft);
             color: var(--muted);
             font-size: .75rem;
             margin-right: 5px;
         }
 
         div[data-testid="stMetric"] {
-            background: #FFFFFF;
-            border: 1px solid var(--line);
+            background: var(--app-panel);
+            border: 1px solid var(--app-border);
             padding: 12px 14px;
             border-radius: 12px;
+            box-shadow: var(--app-shadow);
+            transition:
+                transform 180ms ease,
+                border-color 180ms ease,
+                background-color 180ms ease;
         }
 
-        .small-note { color: var(--muted); font-size: .83rem; }
+        div[data-testid="stMetric"]:hover {
+            transform: translateY(-1px);
+            background: var(--app-panel-hover);
+            border-color: color-mix(
+                in srgb,
+                var(--app-primary) 45%,
+                var(--app-border) 55%
+            );
+        }
+
+        div[data-testid="stMetric"] label,
+        div[data-testid="stMetric"] [data-testid="stMetricLabel"] {
+            color: var(--muted) !important;
+        }
+
+        div[data-testid="stMetric"] [data-testid="stMetricValue"] {
+            color: var(--app-text) !important;
+        }
+
+        .stTabs [data-baseweb="tab-list"] {
+            background: var(--app-panel-soft);
+            border-radius: 10px;
+            padding: 2px 4px;
+        }
+
+        .stTabs [data-baseweb="tab"] {
+            color: var(--muted) !important;
+        }
+
+        .stTabs [data-baseweb="tab"]:hover {
+            color: var(--app-text) !important;
+            background: var(--app-panel-hover);
+        }
+
+        .stTabs [data-baseweb="tab"][aria-selected="true"] {
+            color: var(--app-text) !important;
+            font-weight: 700;
+            background: color-mix(
+                in srgb,
+                var(--app-primary) 11%,
+                transparent
+            );
+        }
+
+        .stTabs [data-baseweb="tab-highlight"] {
+            background-color: var(--app-primary) !important;
+        }
+
+        [data-testid="stExpander"] {
+            border-color: var(--app-border) !important;
+            background: transparent !important;
+        }
+
+        [data-testid="stExpander"] summary:hover {
+            background: var(--app-panel-hover) !important;
+        }
+
+        .stButton > button,
+        .stDownloadButton > button {
+            border-color: var(--app-border) !important;
+        }
+
+        .stButton > button:hover,
+        .stDownloadButton > button:hover {
+            border-color: var(--app-primary) !important;
+            box-shadow: 0 5px 16px rgba(0, 0, 0, .10);
+        }
+
+        [data-testid="stDataFrame"] {
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        hr {
+            border: none !important;
+            border-top: 1px solid var(--app-border) !important;
+        }
 
         @media (max-width: 900px) {
-            .hero { padding: 22px 20px; }
-            .hero h1 { font-size: 1.7rem; }
+            .hero {
+                padding: 22px 20px;
+            }
+
+            .hero h1 {
+                font-size: 1.7rem;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: .001ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: .001ms !important;
+                scroll-behavior: auto !important;
+            }
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
-
 
 inject_css()
 
@@ -559,18 +819,87 @@ def render_source_pills(labels: List[str]) -> None:
     st.markdown(html, unsafe_allow_html=True)
 
 
+def get_active_theme() -> Dict[str, str]:
+    """Return display-only colours matching Streamlit's active theme."""
+    try:
+        theme_type = str(st.context.theme.type).lower()
+    except Exception:
+        theme_type = "light"
+
+    if theme_type == "dark":
+        return {
+            "template": "plotly_dark",
+            "text": "#E6EDF1",
+            "grid": "#33404A",
+            "line": "#46545E",
+            "hover_bg": "#24313A",
+            "hover_text": "#F7FAFB",
+        }
+
+    return {
+        "template": "plotly_white",
+        "text": "#31464F",
+        "grid": "#E8EFF0",
+        "line": "#D7E3E7",
+        "hover_bg": "#163B4D",
+        "hover_text": "#FFFFFF",
+    }
+
+
 def base_plot_layout(fig: go.Figure, height: int = 470) -> go.Figure:
+    """
+    Apply presentation-only Plotly theming.
+    Chart data, calculations, labels and class ordering are unchanged.
+    """
+    theme = get_active_theme()
+
     fig.update_layout(
         height=height,
-        template="plotly_white",
+        template=theme["template"],
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
         margin=dict(l=20, r=20, t=70, b=30),
-        font=dict(family="Arial", size=13, color="#31464F"),
-        title_font=dict(size=18, color="#16303A"),
+        font=dict(
+            family="Arial",
+            size=13,
+            color=theme["text"],
+        ),
+        title_font=dict(
+            size=18,
+            color=theme["text"],
+        ),
+        legend=dict(
+            font=dict(color=theme["text"]),
+            bgcolor="rgba(0,0,0,0)",
+        ),
         legend_title_text="",
-        hoverlabel=dict(font_size=12),
+        hoverlabel=dict(
+            bgcolor=theme["hover_bg"],
+            bordercolor=theme["line"],
+            font=dict(
+                size=12,
+                color=theme["hover_text"],
+            ),
+        ),
     )
-    fig.update_xaxes(showgrid=True, gridcolor="#E8EFF0", zeroline=False)
-    fig.update_yaxes(showgrid=False, zeroline=False)
+
+    fig.update_xaxes(
+        showgrid=True,
+        gridcolor=theme["grid"],
+        zeroline=False,
+        linecolor=theme["line"],
+        tickfont=dict(color=theme["text"]),
+        title_font=dict(color=theme["text"]),
+    )
+
+    fig.update_yaxes(
+        showgrid=False,
+        zeroline=False,
+        linecolor=theme["line"],
+        tickfont=dict(color=theme["text"]),
+        title_font=dict(color=theme["text"]),
+    )
+
     return fig
 
 
