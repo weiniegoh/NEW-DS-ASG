@@ -270,7 +270,7 @@ NOTEBOOK_CV_RESULTS = {
     },
     "Random Forest": {
         "CV Accuracy": 0.9253,
-        "CV Accuracy Std": 0.0208,
+        "CV Accuracy Std": 0.0416,
         "CV F1": 0.9264,
         "CV F1 Std": 0.0211,
     },
