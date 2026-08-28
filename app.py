@@ -1483,6 +1483,346 @@ def inject_dark_mode() -> None:
             }
         }
 
+
+        /* =========================================================
+           DARK MODE TYPOGRAPHY COLOUR HIERARCHY
+           Text colours ONLY — no layout, surface or functionality changes.
+           ========================================================= */
+
+        :root {
+            --text-primary: #F5F5F7;
+            --text-secondary: #A1A1A6;
+            --text-muted: #8E8E93;
+
+            --text-blue: #0A84FF;
+            --text-cyan: #64D2FF;
+            --text-green: #30D158;
+            --text-amber: #FF9F0A;
+            --text-purple: #BF5AF2;
+
+            --model-logistic: #78B7E8;
+            --model-knn: #64D2C8;
+            --model-rf: #63D391;
+            --model-xgb: #BF7AF0;
+        }
+
+        /* Primary hierarchy */
+        h1,
+        .hero h1 {
+            color: var(--text-primary) !important;
+        }
+
+        h2 {
+            color: var(--text-primary) !important;
+        }
+
+        h3,
+        h4 {
+            color: #D7D7DC !important;
+        }
+
+        h5,
+        h6 {
+            color: var(--text-secondary) !important;
+        }
+
+        /* Body copy */
+        [data-testid="stMarkdownContainer"] p {
+            color: var(--text-secondary);
+        }
+
+        [data-testid="stMarkdownContainer"] li {
+            color: var(--text-secondary);
+        }
+
+        [data-testid="stMarkdownContainer"] strong,
+        [data-testid="stMarkdownContainer"] b {
+            color: var(--text-primary);
+        }
+
+        /* Captions and helper text */
+        [data-testid="stCaptionContainer"],
+        [data-testid="stCaptionContainer"] p,
+        .small-note,
+        .kpi-note {
+            color: var(--text-muted) !important;
+        }
+
+        .source-pill {
+            color: var(--text-secondary) !important;
+        }
+
+        .hero p {
+            color: var(--text-secondary) !important;
+        }
+
+        /* KPI hierarchy */
+        .kpi-label {
+            color: var(--text-secondary) !important;
+        }
+
+        .kpi-value {
+            color: var(--text-primary) !important;
+        }
+
+        div[data-testid="stMetric"]
+        [data-testid="stMetricLabel"],
+        div[data-testid="stMetric"] label {
+            color: var(--text-secondary) !important;
+        }
+
+        div[data-testid="stMetric"]
+        [data-testid="stMetricValue"] {
+            color: var(--text-primary) !important;
+        }
+
+        div[data-testid="stMetricDelta"] {
+            color: var(--text-muted) !important;
+        }
+
+        /* Data preparation */
+        .flow-content b {
+            color: #79BCFF !important;
+        }
+
+        .flow-content span {
+            color: var(--text-secondary) !important;
+        }
+
+        .flow-num {
+            color: var(--text-cyan) !important;
+        }
+
+        /* Insight boxes */
+        .insight-title {
+            color: var(--text-cyan) !important;
+        }
+
+        .insight-body {
+            color: var(--text-secondary) !important;
+        }
+
+        .callout {
+            color: var(--text-secondary) !important;
+        }
+
+        .callout strong,
+        .callout b {
+            color: var(--text-blue) !important;
+        }
+
+        /* Prediction */
+        .prediction-heading {
+            color: #79BCFF !important;
+        }
+
+        .prediction-heading + div .kpi-value {
+            color: var(--text-primary) !important;
+        }
+
+        /* Sidebar */
+        [data-testid="stSidebar"] h1,
+        [data-testid="stSidebar"] h2,
+        [data-testid="stSidebar"] h3 {
+            color: var(--text-primary) !important;
+        }
+
+        [data-testid="stSidebar"] p {
+            color: var(--text-secondary) !important;
+        }
+
+        [data-testid="stSidebar"]
+        [data-testid="stCaptionContainer"] p {
+            color: var(--text-muted) !important;
+        }
+
+        [data-testid="stSidebar"]
+        div[role="radiogroup"]
+        label {
+            color: var(--text-secondary) !important;
+        }
+
+        [data-testid="stSidebar"]
+        div[role="radiogroup"]
+        label span {
+            color: var(--text-secondary) !important;
+        }
+
+        [data-testid="stSidebar"]
+        div[role="radiogroup"]
+        label:hover,
+        [data-testid="stSidebar"]
+        div[role="radiogroup"]
+        label:hover span {
+            color: #D1D1D6 !important;
+        }
+
+        [data-testid="stSidebar"]
+        div[role="radiogroup"]
+        label:has(input:checked),
+        [data-testid="stSidebar"]
+        div[role="radiogroup"]
+        label:has(input:checked) span {
+            color: var(--text-primary) !important;
+        }
+
+        /* Tabs */
+        .stTabs [data-baseweb="tab"] {
+            color: var(--text-muted) !important;
+        }
+
+        .stTabs [data-baseweb="tab"]:hover {
+            color: #D1D1D6 !important;
+        }
+
+        .stTabs [data-baseweb="tab"][aria-selected="true"] {
+            color: #79BCFF !important;
+        }
+
+        /* Form / input labels */
+        [data-testid="stWidgetLabel"] p,
+        [data-testid="stWidgetLabel"] label,
+        [data-testid="stSelectbox"] label,
+        [data-testid="stNumberInput"] label,
+        [data-testid="stSlider"] label,
+        [data-testid="stRadio"] label {
+            color: #D1D1D6 !important;
+        }
+
+        [data-baseweb="select"] input,
+        [data-baseweb="input"] input {
+            color: var(--text-primary) !important;
+        }
+
+        [role="option"] {
+            color: #D1D1D6 !important;
+        }
+
+        [role="option"][aria-selected="true"] {
+            color: var(--text-primary) !important;
+        }
+
+        /* Expanders */
+        [data-testid="stExpander"] summary,
+        [data-testid="stExpander"] summary p {
+            color: #D1D1D6 !important;
+        }
+
+        [data-testid="stExpander"]
+        [data-testid="stMarkdownContainer"] p {
+            color: var(--text-secondary);
+        }
+
+        /* Native alerts — text only */
+        [data-testid="stAlert"] p {
+            color: #D1D1D6 !important;
+        }
+
+        [data-testid="stAlert"] strong,
+        [data-testid="stAlert"] b {
+            color: var(--text-primary) !important;
+        }
+
+        /* Data Preparation headings */
+        h3[id*="preprocessing"],
+        h3[id*="train-test"],
+        h3[id*="data-quality"],
+        h3[id*="categorical-consistency"],
+        h3[id*="outlier"],
+        h3[id*="encoding"],
+        h3[id*="scaling"] {
+            color: #79BCFF !important;
+        }
+
+        /* EDA headings */
+        h3[id*="obesity-class-distribution"],
+        h3[id*="numerical-distribution"],
+        h3[id*="obesity-level-vs"],
+        h3[id*="weight-height"],
+        h3[id*="lifestyle"],
+        h3[id*="relationship-correlation"],
+        h3[id*="analytical-insights"],
+        h3[id*="from-eda"] {
+            color: var(--text-cyan) !important;
+        }
+
+        /* Modelling / advanced analytics headings */
+        h3[id*="model-ranking"],
+        h3[id*="performance-comparison"],
+        h3[id*="cross-validation"],
+        h3[id*="misclassification"],
+        h3[id*="strengths-limitations"],
+        h3[id*="feature-importance"],
+        h3[id*="coefficient"],
+        h3[id*="permutation"],
+        h3[id*="roc"] {
+            color: #C991F4 !important;
+        }
+
+        /* Recommendation */
+        h3[id*="final-model-recommendation"] {
+            color: var(--text-green) !important;
+        }
+
+        /* Model heading accents */
+        h3[id*="logistic-regression"] {
+            color: var(--model-logistic) !important;
+        }
+
+        h3[id*="k-nearest-neighbours"],
+        h3[id*="knn"] {
+            color: var(--model-knn) !important;
+        }
+
+        h3[id*="random-forest"] {
+            color: var(--model-rf) !important;
+        }
+
+        h3[id*="xgboost"] {
+            color: var(--model-xgb) !important;
+        }
+
+        /* Semantic headings */
+        h3[id*="limitation"],
+        h4[id*="limitation"],
+        h3[id*="dataset-limitation"] {
+            color: var(--text-amber) !important;
+        }
+
+        h3[id*="prediction"] {
+            color: #79BCFF !important;
+        }
+
+        /* Footer and links */
+        .stApp > footer,
+        footer {
+            color: var(--text-muted) !important;
+        }
+
+        a {
+            color: #64A9FF !important;
+        }
+
+        a:hover {
+            color: #8DC1FF !important;
+        }
+
+        /* Button text only */
+        [data-testid="stBaseButton-primary"],
+        [data-testid="stFormSubmitButton"] button {
+            color: #FFFFFF !important;
+        }
+
+        [data-testid="stBaseButton-secondary"],
+        [data-testid="stBaseButton-tertiary"] {
+            color: var(--text-primary) !important;
+        }
+
+        button:disabled,
+        button:disabled * {
+            color: #6E6E73 !important;
+        }
+
         </style>
         """,
         unsafe_allow_html=True,
