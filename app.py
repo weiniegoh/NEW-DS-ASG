@@ -2992,44 +2992,44 @@ def render_prediction_page() -> None:
         submitted = st.form_submit_button("Run classification", use_container_width=True)
 
         if submitted:
-        values = {
-            "Gender": gender,
-            "Age": age,
-            "Height": height,
-            "Weight": weight,
-            "family_history_with_overweight": family_history,
-            "FAVC": favc,
-            "FCVC": fcvc,
-            "NCP": ncp,
-            "CAEC": caec,
-            "SMOKE": smoke,
-            "CH2O": ch2o,
-            "SCC": scc,
-            "FAF": faf,
-            "TUE": tue,
-            "CALC": calc,
-            "MTRANS": mtrans,
-        }
+            values = {
+                "Gender": gender,
+                "Age": age,
+                "Height": height,
+                "Weight": weight,
+                "family_history_with_overweight": family_history,
+                "FAVC": favc,
+                "FCVC": fcvc,
+                "NCP": ncp,
+                "CAEC": caec,
+                "SMOKE": smoke,
+                "CH2O": ch2o,
+                "SCC": scc,
+                "FAF": faf,
+                "TUE": tue,
+                "CALC": calc,
+                "MTRANS": mtrans,
+            }
 
-        # ---- TEMPORARY DEBUG: remove once mismatch is resolved ----
-        st.write("### 🔍 DEBUG: Raw submitted values")
-        st.write(values)
+            # ---- TEMPORARY DEBUG: remove once mismatch is resolved ----
+            st.write("### 🔍 DEBUG: Raw submitted values")
+            st.write(values)
+    
+            debug_model = load_model(MODEL_REGISTRY[model_name]["model_path"])
+            debug_encoded_row = build_encoded_prediction_row(model_name, debug_model, values)
+            st.write("### 🔍 DEBUG: Encoded row sent to model")
+            st.dataframe(debug_encoded_row)
+            st.write("### 🔍 DEBUG: Model's expected feature order")
+            st.write(get_prediction_columns(model_name, debug_model))
+            # ---- END DEBUG ----
 
-        debug_model = load_model(MODEL_REGISTRY[model_name]["model_path"])
-        debug_encoded_row = build_encoded_prediction_row(model_name, debug_model, values)
-        st.write("### 🔍 DEBUG: Encoded row sent to model")
-        st.dataframe(debug_encoded_row)
-        st.write("### 🔍 DEBUG: Model's expected feature order")
-        st.write(get_prediction_columns(model_name, debug_model))
-        # ---- END DEBUG ----
-
-        try:
-            result = make_prediction(model_name, values)
-            result["BMI"] = bmi
-            result["inputs"] = values
-            st.session_state["prediction_result"] = result
-        except Exception as exc:
-            st.error(f"Prediction could not be completed safely: {exc}")
+            try:
+                result = make_prediction(model_name, values)
+                result["BMI"] = bmi
+                result["inputs"] = values
+                st.session_state["prediction_result"] = result
+            except Exception as exc:
+                st.error(f"Prediction could not be completed safely: {exc}")
 
     result = st.session_state.get("prediction_result")
     if result is None:
