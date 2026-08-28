@@ -1383,11 +1383,13 @@ def inject_dark_mode() -> None:
            PRIMARY BUTTONS
            ========================================================= */
 
+        [data-testid="stFormSubmitButton"] button,
+        [data-testid="stFormSubmitButton"] button *,
         [data-testid="stBaseButton-primary"],
-        [data-testid="stFormSubmitButton"] button {
-            background: #0A84FF !important;
+        [data-testid="stBaseButton-primary"] * {
             color: #FFFFFF !important;
-            border: 1px solid #0A84FF !important;
+            -webkit-text-fill-color: #FFFFFF !important;
+        }
             border-radius: 9px !important;
             box-shadow: none !important;
         }
