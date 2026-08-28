@@ -908,7 +908,7 @@ inject_css()
 # Dark Mode ONLY — Light Mode remains exactly as defined above.
 # =============================================================================
 
-def inject_apple_dark_mode() -> None:
+def inject_dark_mode() -> None:
     """
     This block runs only when Streamlit's active appearance is Dark.
     It does not modify layout, analytics, models, data, prediction logic,
@@ -927,7 +927,7 @@ def inject_apple_dark_mode() -> None:
         <style>
 
         /* =========================================================
-           APPLE DARK PALETTE
+            DARK PALETTE
            ========================================================= */
 
         :root {
@@ -1489,7 +1489,7 @@ def inject_apple_dark_mode() -> None:
     )
 
 
-inject_apple_dark_mode()
+inject_dark_mode()
 
 
 # =============================================================================
@@ -1582,7 +1582,6 @@ def get_active_theme() -> Dict[str, str]:
         theme_type = "light"
 
     if theme_type == "dark":
-        # Apple/macOS-inspired graphite chart theme.
         # Presentation only: chart data, labels, ordering and calculations are unchanged.
         return {
             "template": "none",
