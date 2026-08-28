@@ -373,8 +373,41 @@ def inject_css() -> None:
             --warning: #C58B16;
         }
 
+        /* ===== MOTION / INTERACTION LAYER ===== */
+        @keyframes appFadeUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes heroGlow {
+            0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: .45; }
+            50% { transform: translate3d(-12px, 8px, 0) scale(1.08); opacity: .72; }
+        }
+
+        @keyframes floatOrb {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-10px) rotate(4deg); }
+        }
+
+        @keyframes pulseDot {
+            0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--app-primary) 28%, transparent); }
+            50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--app-primary) 0%, transparent); }
+        }
+
+        @keyframes shine {
+            0% { transform: translateX(-130%) skewX(-18deg); }
+            55%, 100% { transform: translateX(230%) skewX(-18deg); }
+        }
+
+        @keyframes buttonPulse {
+            0%, 100% { box-shadow: 0 5px 16px rgba(0,0,0,.08); }
+            50% { box-shadow: 0 7px 22px color-mix(in srgb, var(--app-primary) 22%, transparent); }
+        }
+
         .stApp,
         [data-testid="stAppViewContainer"] {
+            position: relative;
+            overflow-x: hidden;
             background:
                 radial-gradient(
                     circle at 94% 4%,
@@ -394,6 +427,36 @@ def inject_css() -> None:
             max-width: 1450px;
             padding-top: 1.4rem;
             padding-bottom: 2rem;
+            animation: appFadeUp .55s ease both;
+        }
+
+        /* A very subtle moving atmosphere behind the dashboard. */
+        [data-testid="stAppViewContainer"]::before,
+        [data-testid="stAppViewContainer"]::after {
+            content: "";
+            position: fixed;
+            width: 220px;
+            height: 220px;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 0;
+            filter: blur(3px);
+        }
+
+        [data-testid="stAppViewContainer"]::before {
+            top: 9%;
+            right: -80px;
+            background: color-mix(in srgb, var(--app-primary) 7%, transparent);
+            animation: floatOrb 8s ease-in-out infinite;
+        }
+
+        [data-testid="stAppViewContainer"]::after {
+            bottom: 7%;
+            left: -100px;
+            width: 180px;
+            height: 180px;
+            background: color-mix(in srgb, var(--app-primary) 4%, transparent);
+            animation: floatOrb 10s ease-in-out infinite reverse;
         }
 
         h1, h2, h3, h4, h5, h6 {
@@ -445,6 +508,7 @@ def inject_css() -> None:
         [data-testid="stSidebar"]
         div[role="radiogroup"]
         label:has(input:checked) {
+            animation: appFadeUp .25s ease both;
             background: color-mix(
                 in srgb,
                 var(--app-primary) 14%,
@@ -455,9 +519,11 @@ def inject_css() -> None:
         }
 
         .hero {
-            padding: 28px 30px;
+            position: relative;
+            overflow: hidden;
+            padding: 30px 32px;
             border: 1px solid var(--app-border);
-            border-radius: 18px;
+            border-radius: 20px;
             background:
                 linear-gradient(
                     135deg,
@@ -470,6 +536,38 @@ def inject_css() -> None:
                 );
             box-shadow: var(--app-shadow);
             margin-bottom: 18px;
+            animation: appFadeUp .65s ease both;
+        }
+
+        .hero::before {
+            content: "";
+            position: absolute;
+            width: 190px;
+            height: 190px;
+            right: -55px;
+            top: -85px;
+            border-radius: 50%;
+            background: color-mix(in srgb, var(--app-primary) 15%, transparent);
+            filter: blur(2px);
+            animation: heroGlow 6s ease-in-out infinite;
+        }
+
+        .hero::after {
+            content: "";
+            position: absolute;
+            left: -20%;
+            top: 0;
+            width: 35%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--app-primary) 8%, transparent), transparent);
+            transform: translateX(-130%) skewX(-18deg);
+            animation: shine 8s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        .hero h1, .hero p {
+            position: relative;
+            z-index: 1;
         }
 
         .hero h1 {
@@ -485,6 +583,8 @@ def inject_css() -> None:
         }
 
         .kpi-card {
+            position: relative;
+            overflow: hidden;
             background: var(--app-panel);
             border: 1px solid var(--app-border);
             border-radius: 14px;
@@ -492,9 +592,27 @@ def inject_css() -> None:
             min-height: 112px;
             box-shadow: var(--app-shadow);
             transition:
-                transform 180ms ease,
-                border-color 180ms ease,
-                background-color 180ms ease;
+                transform 220ms ease,
+                border-color 220ms ease,
+                background-color 220ms ease,
+                box-shadow 220ms ease;
+            animation: appFadeUp .55s ease both;
+        }
+
+        .kpi-card::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 34%;
+            left: -45%;
+            background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--app-primary) 12%, transparent), transparent);
+            transform: skewX(-18deg);
+            transition: none;
+        }
+
+        .kpi-card:hover::after {
+            animation: shine 1.05s ease;
         }
 
         .kpi-card:hover {
@@ -599,6 +717,24 @@ def inject_css() -> None:
             font-size: .92rem;
         }
 
+        .prediction-heading {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            font-size: 1.35rem;
+            font-weight: 760;
+            margin: 18px 0 10px;
+            animation: appFadeUp .45s ease both;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--app-primary);
+            animation: pulseDot 1.8s ease-in-out infinite;
+        }
+
         .section-eyebrow {
             text-transform: uppercase;
             letter-spacing: .08em;
@@ -693,10 +829,41 @@ def inject_css() -> None:
             border-color: var(--app-border) !important;
         }
 
+        .stButton > button,
+        .stDownloadButton > button {
+            position: relative;
+            overflow: hidden;
+            transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease !important;
+        }
+
         .stButton > button:hover,
         .stDownloadButton > button:hover {
             border-color: var(--app-primary) !important;
-            box-shadow: 0 5px 16px rgba(0, 0, 0, .10);
+            transform: translateY(-2px);
+            animation: buttonPulse 1.2s ease-in-out infinite;
+        }
+
+        .stButton > button:active,
+        .stDownloadButton > button:active {
+            transform: translateY(0) scale(.985);
+        }
+
+        .stButton > button::after,
+        .stDownloadButton > button::after {
+            content: "";
+            position: absolute;
+            top: -20%;
+            left: -80%;
+            width: 35%;
+            height: 140%;
+            background: rgba(255,255,255,.20);
+            transform: skewX(-18deg);
+            pointer-events: none;
+        }
+
+        .stButton > button:hover::after,
+        .stDownloadButton > button:hover::after {
+            animation: shine .9s ease;
         }
 
         [data-testid="stDataFrame"] {
@@ -3024,7 +3191,10 @@ def render_prediction_page() -> None:
         st.info("Complete the form and click **Run classification** to display a prediction.")
         return
 
-    st.markdown("### Prediction result")
+    st.markdown(
+        '<div class="prediction-heading"><span class="status-dot"></span> Prediction result</div>',
+        unsafe_allow_html=True,
+    )
     render_kpi_grid(
         [
             ("Predicted Obesity Level", display_label(result["prediction"]), "Highest predicted probability"),
