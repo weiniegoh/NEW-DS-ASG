@@ -3011,18 +3011,6 @@ def render_prediction_page() -> None:
                 "MTRANS": mtrans,
             }
 
-            # ---- TEMPORARY DEBUG: remove once mismatch is resolved ----
-            st.write("### 🔍 DEBUG: Raw submitted values")
-            st.write(values)
-    
-            debug_model = load_model(MODEL_REGISTRY[model_name]["model_path"])
-            debug_encoded_row = build_encoded_prediction_row(model_name, debug_model, values)
-            st.write("### 🔍 DEBUG: Encoded row sent to model")
-            st.dataframe(debug_encoded_row)
-            st.write("### 🔍 DEBUG: Model's expected feature order")
-            st.write(get_prediction_columns(model_name, debug_model))
-            # ---- END DEBUG ----
-
             try:
                 result = make_prediction(model_name, values)
                 result["BMI"] = bmi
