@@ -905,6 +905,594 @@ inject_css()
 
 
 # =============================================================================
+# Dark Mode ONLY — Light Mode remains exactly as defined above.
+# =============================================================================
+
+def inject_apple_dark_mode() -> None:
+    """
+    This block runs only when Streamlit's active appearance is Dark.
+    It does not modify layout, analytics, models, data, prediction logic,
+    navigation, session state, charts' data, forms, or Light Mode styling.
+    """
+    try:
+        is_dark = str(st.context.theme.type).lower() == "dark"
+    except Exception:
+        is_dark = False
+
+    if not is_dark:
+        return
+
+    st.markdown(
+        """
+        <style>
+
+        /* =========================================================
+           APPLE DARK PALETTE
+           ========================================================= */
+
+        :root {
+            --primary-color: #0A84FF;
+
+            --app-primary: #0A84FF;
+
+            --app-bg: #1C1C1E;
+            --app-secondary: #242426;
+            --app-panel: #2C2C2E;
+            --app-panel-soft: #242426;
+            --app-panel-hover: #323234;
+
+            --app-text: #F5F5F7;
+
+            --app-border: rgba(255, 255, 255, 0.08);
+
+            --app-shadow:
+                0 1px 2px rgba(0, 0, 0, 0.25),
+                0 8px 24px rgba(0, 0, 0, 0.12);
+
+            --ink: #F5F5F7;
+            --muted: #A1A1A6;
+
+            --panel: #2C2C2E;
+            --bg: #1C1C1E;
+            --line: rgba(255, 255, 255, 0.08);
+
+            --teal: #0A84FF;
+            --teal-dark: #409CFF;
+            --teal-soft: rgba(10, 132, 255, 0.10);
+
+            --warning: #FF9F0A;
+
+            color-scheme: dark;
+        }
+
+
+        /* =========================================================
+           MAIN APPLICATION SURFACE
+           ========================================================= */
+
+        .stApp,
+        [data-testid="stAppViewContainer"] {
+            background: #1C1C1E !important;
+            color: #F5F5F7 !important;
+        }
+
+        /* Keep existing atmosphere but remove colourful/glowing effect. */
+        [data-testid="stAppViewContainer"]::before,
+        [data-testid="stAppViewContainer"]::after {
+            background: rgba(255, 255, 255, 0.008) !important;
+            filter: blur(12px) !important;
+        }
+
+
+        /* =========================================================
+           TYPOGRAPHY
+           ========================================================= */
+
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
+            color: #F5F5F7 !important;
+            text-shadow: none !important;
+        }
+
+        p,
+        li {
+            color: #F5F5F7;
+        }
+
+        [data-testid="stCaptionContainer"],
+        [data-testid="stCaptionContainer"] p,
+        .small-note,
+        .kpi-label,
+        .kpi-note,
+        .flow-content span {
+            color: #A1A1A6 !important;
+        }
+
+        .section-eyebrow {
+            color: #0A84FF !important;
+        }
+
+
+        /* =========================================================
+           SIDEBAR — macOS STYLE
+           ========================================================= */
+
+        [data-testid="stSidebar"] {
+            background: #242426 !important;
+            border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
+        }
+
+        [data-testid="stSidebar"] h1,
+        [data-testid="stSidebar"] h2,
+        [data-testid="stSidebar"] h3,
+        [data-testid="stSidebar"] p,
+        [data-testid="stSidebar"] span {
+            color: #F5F5F7;
+        }
+
+        [data-testid="stSidebar"]
+        [data-testid="stCaptionContainer"] p {
+            color: #8E8E93 !important;
+        }
+
+        [data-testid="stSidebar"] hr {
+            border-color: rgba(255, 255, 255, 0.08) !important;
+        }
+
+        [data-testid="stSidebar"]
+        div[role="radiogroup"]
+        label {
+            border-left: 3px solid transparent !important;
+            border-radius: 9px;
+            background: transparent !important;
+            transition:
+                background-color 180ms ease,
+                border-color 180ms ease,
+                transform 180ms ease;
+        }
+
+        [data-testid="stSidebar"]
+        div[role="radiogroup"]
+        label:hover {
+            background: #303032 !important;
+            border-left-color: rgba(10, 132, 255, 0.35) !important;
+            transform: translateX(1px);
+        }
+
+        [data-testid="stSidebar"]
+        div[role="radiogroup"]
+        label:has(input:checked) {
+            background: #3A3A3C !important;
+            border-left-color: #0A84FF !important;
+            font-weight: 600 !important;
+        }
+
+
+        /* =========================================================
+           HERO
+           ========================================================= */
+
+        .hero {
+            background: #242426 !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            box-shadow:
+                0 1px 2px rgba(0, 0, 0, 0.22),
+                0 8px 24px rgba(0, 0, 0, 0.10) !important;
+        }
+
+        .hero h1 {
+            color: #F5F5F7 !important;
+        }
+
+        .hero p {
+            color: #A1A1A6 !important;
+        }
+
+        .hero::before {
+            background: rgba(255, 255, 255, 0.018) !important;
+            filter: blur(10px) !important;
+        }
+
+        .hero::after {
+            background:
+                linear-gradient(
+                    90deg,
+                    transparent,
+                    rgba(255, 255, 255, 0.025),
+                    transparent
+                ) !important;
+        }
+
+
+        /* =========================================================
+           KPI / CUSTOM CARDS
+           ========================================================= */
+
+        .kpi-card {
+            background: #2C2C2E !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            box-shadow:
+                0 1px 2px rgba(0, 0, 0, 0.25),
+                0 8px 24px rgba(0, 0, 0, 0.12) !important;
+        }
+
+        .kpi-card:hover {
+            background: #323234 !important;
+            border-color: rgba(255, 255, 255, 0.12) !important;
+            transform: translateY(-1px) !important;
+            box-shadow:
+                0 1px 3px rgba(0, 0, 0, 0.26),
+                0 9px 26px rgba(0, 0, 0, 0.13) !important;
+        }
+
+        .kpi-card::after {
+            background:
+                linear-gradient(
+                    90deg,
+                    transparent,
+                    rgba(255, 255, 255, 0.035),
+                    transparent
+                ) !important;
+        }
+
+        .kpi-value {
+            color: #F5F5F7 !important;
+        }
+
+        .kpi-label {
+            color: #A1A1A6 !important;
+        }
+
+        .kpi-note {
+            color: #8E8E93 !important;
+        }
+
+
+        /* =========================================================
+           STREAMLIT METRIC CARDS
+           ========================================================= */
+
+        div[data-testid="stMetric"] {
+            background: #2C2C2E !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            box-shadow:
+                0 1px 2px rgba(0, 0, 0, 0.25),
+                0 8px 24px rgba(0, 0, 0, 0.10) !important;
+        }
+
+        div[data-testid="stMetric"]:hover {
+            background: #323234 !important;
+            border-color: rgba(255, 255, 255, 0.12) !important;
+            transform: translateY(-1px) !important;
+        }
+
+        div[data-testid="stMetric"]
+        [data-testid="stMetricValue"] {
+            color: #F5F5F7 !important;
+        }
+
+        div[data-testid="stMetric"]
+        [data-testid="stMetricLabel"],
+        div[data-testid="stMetric"] label {
+            color: #A1A1A6 !important;
+        }
+
+
+        /* =========================================================
+           ANALYTICAL INSIGHT BOXES
+           ========================================================= */
+
+        .insight-box {
+            background: rgba(10, 132, 255, 0.085) !important;
+            border: 1px solid rgba(10, 132, 255, 0.20) !important;
+            border-left: 3px solid #0A84FF !important;
+            box-shadow: none !important;
+        }
+
+        .insight-title {
+            color: #F5F5F7 !important;
+        }
+
+        .insight-body {
+            color: #A1A1A6 !important;
+        }
+
+        .callout {
+            background: rgba(10, 132, 255, 0.08) !important;
+            border: 1px solid rgba(10, 132, 255, 0.18) !important;
+            color: #F5F5F7 !important;
+            box-shadow: none !important;
+        }
+
+
+        /* =========================================================
+           DATA PREPARATION FLOW
+           ========================================================= */
+
+        .flow-step {
+            background: #2C2C2E !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            box-shadow: none !important;
+        }
+
+        .flow-content b {
+            color: #F5F5F7 !important;
+        }
+
+        .flow-content span {
+            color: #A1A1A6 !important;
+        }
+
+        .flow-num {
+            background: rgba(10, 132, 255, 0.13) !important;
+            color: #409CFF !important;
+            border: 1px solid rgba(10, 132, 255, 0.20);
+        }
+
+
+        /* =========================================================
+           SOURCE PILLS
+           ========================================================= */
+
+        .source-pill {
+            background: #2C2C2E !important;
+            color: #A1A1A6 !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        }
+
+
+        /* =========================================================
+           PREDICTION STATUS
+           ========================================================= */
+
+        .prediction-heading {
+            color: #F5F5F7 !important;
+        }
+
+        .status-dot {
+            background: #0A84FF !important;
+        }
+
+
+        /* =========================================================
+           FORMS
+           ========================================================= */
+
+        [data-testid="stForm"] {
+            background: #242426 !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            border-radius: 14px !important;
+            box-shadow: none !important;
+        }
+
+
+        /* =========================================================
+           INPUTS / SELECTBOXES
+           ========================================================= */
+
+        [data-baseweb="select"] > div,
+        [data-testid="stNumberInput"] [data-baseweb="input"],
+        [data-testid="stTextInput"] [data-baseweb="input"] {
+            background: #2C2C2E !important;
+            border-color: rgba(255, 255, 255, 0.10) !important;
+            color: #F5F5F7 !important;
+            box-shadow: none !important;
+        }
+
+        [data-baseweb="select"] input,
+        [data-baseweb="input"] input {
+            color: #F5F5F7 !important;
+        }
+
+        [data-baseweb="select"] > div:hover,
+        [data-baseweb="input"]:hover {
+            border-color: rgba(255, 255, 255, 0.16) !important;
+        }
+
+        [data-baseweb="select"] > div:focus-within,
+        [data-baseweb="input"]:focus-within {
+            border-color: #0A84FF !important;
+            box-shadow: 0 0 0 1px rgba(10, 132, 255, 0.35) !important;
+        }
+
+        [data-baseweb="popover"] > div,
+        [data-baseweb="menu"],
+        [role="listbox"] {
+            background: #2C2C2E !important;
+            color: #F5F5F7 !important;
+            border-color: rgba(255, 255, 255, 0.08) !important;
+            box-shadow: 0 10px 35px rgba(0, 0, 0, 0.30) !important;
+        }
+
+        [role="option"] {
+            color: #F5F5F7 !important;
+        }
+
+        [role="option"]:hover {
+            background: #3A3A3C !important;
+        }
+
+        [role="option"][aria-selected="true"] {
+            background: rgba(10, 132, 255, 0.15) !important;
+        }
+
+        [data-baseweb="slider"] [role="slider"] {
+            background: #F5F5F7 !important;
+            border: 2px solid #0A84FF !important;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28) !important;
+        }
+
+
+        /* =========================================================
+           TABS
+           ========================================================= */
+
+        .stTabs [data-baseweb="tab-list"] {
+            background: transparent !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+            border-radius: 0 !important;
+        }
+
+        .stTabs [data-baseweb="tab"] {
+            color: #8E8E93 !important;
+            background: transparent !important;
+        }
+
+        .stTabs [data-baseweb="tab"]:hover {
+            color: #D1D1D6 !important;
+            background: transparent !important;
+        }
+
+        .stTabs
+        [data-baseweb="tab"][aria-selected="true"] {
+            color: #F5F5F7 !important;
+            background: transparent !important;
+            font-weight: 600 !important;
+        }
+
+        .stTabs [data-baseweb="tab-highlight"] {
+            background-color: #0A84FF !important;
+            height: 2px !important;
+        }
+
+
+        /* =========================================================
+           EXPANDERS
+           ========================================================= */
+
+        [data-testid="stExpander"] {
+            background: #242426 !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            border-radius: 12px !important;
+            box-shadow: none !important;
+        }
+
+        [data-testid="stExpander"] summary {
+            color: #F5F5F7 !important;
+        }
+
+        [data-testid="stExpander"] summary:hover {
+            background: #2C2C2E !important;
+        }
+
+
+        /* =========================================================
+           PRIMARY BUTTONS
+           ========================================================= */
+
+        [data-testid="stBaseButton-primary"],
+        [data-testid="stFormSubmitButton"] button {
+            background: #0A84FF !important;
+            color: #FFFFFF !important;
+            border: 1px solid #0A84FF !important;
+            border-radius: 9px !important;
+            box-shadow: none !important;
+        }
+
+        [data-testid="stBaseButton-primary"]:hover,
+        [data-testid="stFormSubmitButton"] button:hover {
+            background: #409CFF !important;
+            border-color: #409CFF !important;
+            color: #FFFFFF !important;
+            transform: translateY(-1px) !important;
+        }
+
+
+        /* =========================================================
+           SECONDARY BUTTONS
+           ========================================================= */
+
+        [data-testid="stBaseButton-secondary"],
+        [data-testid="stBaseButton-tertiary"] {
+            background: #3A3A3C !important;
+            color: #F5F5F7 !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            border-radius: 9px !important;
+            box-shadow: none !important;
+        }
+
+        [data-testid="stBaseButton-secondary"]:hover,
+        [data-testid="stBaseButton-tertiary"]:hover {
+            background: #48484A !important;
+            border-color: rgba(255, 255, 255, 0.12) !important;
+            color: #F5F5F7 !important;
+            transform: translateY(-1px) !important;
+        }
+
+        .stButton > button::after,
+        .stDownloadButton > button::after,
+        [data-testid="stFormSubmitButton"] button::after {
+            background: rgba(255, 255, 255, 0.055) !important;
+        }
+
+
+        /* =========================================================
+           ALERTS / TABLES / CHART CONTAINERS
+           ========================================================= */
+
+        [data-testid="stAlert"] {
+            border-radius: 12px !important;
+            box-shadow: none !important;
+        }
+
+        [data-testid="stDataFrame"] {
+            background: #242426 !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            border-radius: 12px !important;
+            box-shadow: none !important;
+        }
+
+        [data-testid="stPlotlyChart"] {
+            background: transparent !important;
+        }
+
+        hr {
+            border: none !important;
+            border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+        }
+
+
+        /* =========================================================
+           SOFTEN EXISTING DARK-MODE ANIMATIONS
+           Existing animation logic remains unchanged.
+           ========================================================= */
+
+        @keyframes buttonPulse {
+            0%,
+            100% {
+                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.24);
+            }
+
+            50% {
+                box-shadow: 0 2px 7px rgba(0, 0, 0, 0.28);
+            }
+        }
+
+        @keyframes pulseDot {
+            0%,
+            100% {
+                box-shadow: 0 0 0 0 rgba(10, 132, 255, 0.18);
+            }
+
+            50% {
+                box-shadow: 0 0 0 5px rgba(10, 132, 255, 0);
+            }
+        }
+
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+inject_apple_dark_mode()
+
+
+# =============================================================================
 # GENERAL HELPERS
 # =============================================================================
 
@@ -994,13 +1582,16 @@ def get_active_theme() -> Dict[str, str]:
         theme_type = "light"
 
     if theme_type == "dark":
+        # Apple/macOS-inspired graphite chart theme.
+        # Presentation only: chart data, labels, ordering and calculations are unchanged.
         return {
-            "template": "plotly_dark",
-            "text": "#E6EDF1",
-            "grid": "#33404A",
-            "line": "#46545E",
-            "hover_bg": "#24313A",
-            "hover_text": "#F7FAFB",
+            "template": "none",
+            "text": "#F5F5F7",
+            "grid": "rgba(255,255,255,0.08)",
+            "line": "rgba(255,255,255,0.12)",
+            "hover_bg": "#2C2C2E",
+            "hover_text": "#F5F5F7",
+            "marker_contrast": "#F5F5F7",
         }
 
     return {
@@ -1010,6 +1601,7 @@ def get_active_theme() -> Dict[str, str]:
         "line": "#D7E3E7",
         "hover_bg": "#163B4D",
         "hover_text": "#FFFFFF",
+        "marker_contrast": "#16303A",
     }
 
 
@@ -1393,7 +1985,7 @@ def plot_numeric_by_class(df: pd.DataFrame, feature: str) -> go.Figure:
             y=[display_label(c) for c in OBESITY_ORDER],
             mode="markers",
             name="Class mean",
-            marker=dict(symbol="diamond", size=9, color="#16303A"),
+            marker=dict(symbol="diamond", size=9, color=get_active_theme()["marker_contrast"]),
             hovertemplate="Mean: %{x:.2f}<extra></extra>",
         )
     )
