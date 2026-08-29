@@ -1,6 +1,7 @@
 """
 BMDS2003 Data Science — Obesity Risk Analytics & Classification Dashboard
 =========================================================================
+
 Run with:
     streamlit run app.py
 """
@@ -477,46 +478,92 @@ MODEL_INFO = {
     "Logistic Regression": {
         "role": "Baseline model",
         "family": "Linear probabilistic classifier",
-        "configuration": (
-            "max_iter = 2000, random_state = 42. The model pipeline scales the eight numerical predictors with StandardScaler."
+        "short_description": "Linear probabilistic classifier · Baseline model",
+        "configuration_lines": [
+            "max_iter = 2000",
+            "random_state = 42",
+            "numerical preprocessing = StandardScaler (8 numerical predictors)",
+            "hyperparameter tuning = Not applied",
+        ],
+        "strength": (
+            "Interpretable and computationally efficient, providing a clear baseline "
+            "against which the more complex classifiers can be compared."
         ),
-        "strength": "Highly interpretable, fast, and a strong reference baseline.",
-        "limitation": "Linear decision boundaries can miss nonlinear interactions.",
+        "limitation": (
+            "Linear decision boundaries may not capture complex nonlinear relationships "
+            "and feature interactions."
+        ),
         "interpretability": "High",
         "operational_complexity": "Low",
     },
     "K-Nearest Neighbours (KNN)": {
-        "role": "Distance-based nonlinear model",
-        "family": "Instance-based classifier",
-        "configuration": (
-            "n_neighbors = 3, metric = 'manhattan', weights = 'distance'. The model pipeline applies StandardScaler to the eight numerical predictors."
+        "role": "Distance-based model",
+        "family": "Neighbour-based classifier",
+        "short_description": "Neighbour-based classifier · Distance-based model",
+        "configuration_lines": [
+            "n_neighbors = 3",
+            "metric = 'manhattan'",
+            "weights = 'distance'",
+            "numerical preprocessing = StandardScaler (8 numerical predictors)",
+        ],
+        "strength": (
+            "Captures local neighbourhood structure without assuming a linear decision boundary."
         ),
-        "strength": "Captures local neighbourhood structure without a linear-boundary assumption.",
-        "limitation": "Distance-sensitive and prediction cost grows with training-set size.",
+        "limitation": (
+            "Distance-based prediction is sensitive to feature scaling and becomes more "
+            "computationally expensive as the training set grows."
+        ),
         "interpretability": "Medium–Low",
         "operational_complexity": "Medium",
     },
     "Random Forest": {
         "role": "Nonlinear ensemble model",
-        "family": "Bagged decision-tree ensemble",
-        "configuration": (
-            "n_estimators = 500, max_depth = 12, min_samples_split = 5, min_samples_leaf = 2, "
-            "class_weight = 'balanced'. Uses encoded unscaled predictors."
+        "family": "Tree ensemble classifier",
+        "short_description": "Tree ensemble classifier · Nonlinear ensemble model",
+        "configuration_lines": [
+            "n_estimators = 500",
+            "max_depth = 12",
+            "min_samples_split = 5",
+            "min_samples_leaf = 2",
+            "class_weight = 'balanced'",
+            "random_state = 42",
+        ],
+        "strength": (
+            "Captures nonlinear relationships and feature interactions while providing "
+            "tree-based feature importance."
         ),
-        "strength": "Captures nonlinear relationships/interactions and provides tree importance.",
-        "limitation": "Less directly interpretable than the baseline and shows a larger train–test gap.",
+        "limitation": (
+            "Less directly interpretable than Logistic Regression, and the difference between "
+            "training and held-out performance indicates some overfitting risk."
+        ),
         "interpretability": "Medium",
         "operational_complexity": "Medium",
     },
     "XGBoost": {
-        "role": "Boosted-tree final candidate",
-        "family": "Gradient-boosted decision trees",
-        "configuration": (
-            "learning_rate = 0.1, max_depth = 5, subsample = 1.0. Uses the exact 23-feature "
-            "encoded schema and integer target IDs decoded through XGB_CLASS_NAMES."
+        "role": "Boosted ensemble model",
+        "family": "Gradient-boosted trees",
+        "short_description": "Gradient-boosted trees · Final recommended model",
+        "configuration_lines": [
+            "n_estimators = 300",
+            "learning_rate = 0.1",
+            "max_depth = 5",
+            "subsample = 1.0",
+            "colsample_bytree = 0.80",
+            "min_child_weight = 1",
+            "gamma = 0.0",
+            "reg_alpha = 0.0",
+            "reg_lambda = 1.25",
+            "objective = 'multi:softprob'",
+            "eval_metric = 'mlogloss'",
+            "random_state = 42",
+        ],
+        "strength": (
+            "Captures complex nonlinear interactions through sequentially boosted decision trees "
+            "and achieves the strongest overall performance in the final project comparison."
         ),
-        "strength": "Strong predictive performance and captures complex nonlinear interactions.",
-        "limitation": "Lower intrinsic interpretability and greater tuning/deployment complexity.",
+        "limitation": (
+            "Requires careful tuning and is less directly interpretable than Logistic Regression."
+        ),
         "interpretability": "Medium–Low",
         "operational_complexity": "Medium–High",
     },
@@ -1305,7 +1352,7 @@ def inject_css() -> None:
         }
 
         .sidebar-dataset {
-            padding: 3px 1px 0 2px;
+            padding: 3px 2px 0 2px;
         }
 
 
@@ -1354,7 +1401,7 @@ def inject_css() -> None:
 
         /* Slightly tighter sidebar start without touching the collapse control. */
         [data-testid="stSidebarUserContent"] {
-            padding-top: 0.65rem !important;
+            padding-top: 0.52rem !important;
         }
 
         /* Compact Active Model card. */
@@ -1425,8 +1472,7 @@ def inject_css() -> None:
            from the generic .kpi-card component. */
         .model-overview-card,
         .cv-overview-card,
-        .model-summary-card,
-        .model-text-panel {
+        .model-summary-card {
             border: 1px solid var(--app-border);
             background: var(--app-panel);
             border-radius: 12px;
@@ -1436,8 +1482,7 @@ def inject_css() -> None:
 
         .model-overview-label,
         .cv-overview-label,
-        .model-summary-label,
-        .model-text-panel-title {
+        .model-summary-label {
             color: var(--muted);
             font-size: .75rem;
             font-weight: 650;
@@ -1481,17 +1526,6 @@ def inject_css() -> None:
             white-space: normal;
             overflow: visible;
             text-overflow: clip;
-        }
-
-        .model-text-panel {
-            box-shadow: none;
-            height: 100%;
-        }
-
-        .model-text-panel-body {
-            color: var(--muted);
-            font-size: .87rem;
-            line-height: 1.45;
         }
 
         /* Confusion summary uses its own cards so the long pair is never
@@ -1543,6 +1577,80 @@ def inject_css() -> None:
             .model-overview-value,
             .cv-overview-value {
                 font-size: 1.18rem;
+            }
+        }
+
+
+        /* Sidebar brand spacing and colour are intentionally scoped. */
+        .sidebar-brand {
+            margin-top: 0;
+            margin-bottom: 10px;
+            padding: 0;
+        }
+
+        .sidebar-brand-title {
+            margin: 0 0 2px 0;
+            color: #1D1D1F;
+            font-size: 1.42rem;
+            font-weight: 760;
+            line-height: 1.16;
+            letter-spacing: -0.02em;
+        }
+
+        .sidebar-brand-subtitle {
+            margin: 0 0 10px 0;
+            color: #8E8E93;
+            font-size: .82rem;
+            line-height: 1.25;
+        }
+
+        /* Keep the three model-behaviour cards aligned without affecting general KPI cards. */
+        .model-summary-card {
+            min-height: 116px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+        }
+
+        .model-summary-value {
+            min-height: 2.55rem;
+            display: flex;
+            align-items: center;
+        }
+
+        .model-summary-card.confusion-pair .model-summary-value {
+            min-height: 2.55rem;
+        }
+
+        /* Responsive separation before Model Configuration. */
+        .model-config-spacer {
+            height: 24px;
+        }
+
+        .model-config-box {
+            border: 1px solid var(--app-border);
+            background: var(--app-panel-soft);
+            border-radius: 11px;
+            padding: 12px 14px;
+            margin: 6px 0 12px 0;
+        }
+
+        .model-config-line {
+            color: var(--muted);
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+            font-size: .82rem;
+            line-height: 1.48;
+            overflow-wrap: anywhere;
+        }
+
+        @media (max-width: 900px) {
+            .model-summary-card {
+                min-height: 108px;
+            }
+
+            .model-config-spacer {
+                height: 20px;
             }
         }
 
@@ -2183,11 +2291,28 @@ def inject_dark_mode() -> None:
             color: #F5F5F7 !important;
         }
 
+
+        .sidebar-brand-title {
+            color: #F5F5F7 !important;
+        }
+
+        .sidebar-brand-subtitle {
+            color: #8E8E93 !important;
+        }
+
+        .model-config-box {
+            background: #242426 !important;
+            border-color: rgba(255,255,255,.08) !important;
+        }
+
+        .model-config-line {
+            color: #A1A1A6 !important;
+        }
+
         .model-identity-strip,
         .model-overview-card,
         .cv-overview-card,
         .model-summary-card,
-        .model-text-panel,
         .confusion-summary-card {
             background: #2C2C2E !important;
             border-color: rgba(255,255,255,.08) !important;
@@ -4491,7 +4616,7 @@ def plot_cross_model_probability_heatmap(probability_df: pd.DataFrame) -> go.Fig
             zmin=0,
             zmax=1,
             colorscale=probability_scale,
-            text=np.vectorize(lambda value: f"{value:.0%}")(z),
+            text=np.vectorize(lambda value: f"{value:.2%}")(z),
             texttemplate="%{text}",
             customdata=full_names,
             hovertemplate=(
@@ -4510,64 +4635,6 @@ def plot_cross_model_probability_heatmap(probability_df: pd.DataFrame) -> go.Fig
     fig.update_xaxes(tickangle=-18)
     return base_plot_layout(fig, 440)
 
-
-def profile_percentile_dataframe(clean: pd.DataFrame, input_values: Dict) -> pd.DataFrame:
-    rows = []
-    for feature in NUMERICAL_COLUMNS:
-        series = clean[feature].dropna().astype(float)
-        selected = float(input_values[feature])
-        percentile = float((series <= selected).mean())
-        rows.append(
-            {
-                "Feature": feature,
-                "Selected Value": selected,
-                "Dataset Median": float(series.median()),
-                "Percentile": percentile,
-                "Unit": NUMERIC_UNITS[feature],
-            }
-        )
-    return pd.DataFrame(rows)
-
-
-def plot_profile_percentiles(profile_df: pd.DataFrame) -> go.Figure:
-    chart = profile_df.sort_values("Percentile", ascending=True).copy()
-    customdata = np.empty((len(chart), 3), dtype=object)
-    customdata[:, 0] = chart["Selected Value"].to_numpy(dtype=float)
-    customdata[:, 1] = chart["Dataset Median"].to_numpy(dtype=float)
-    customdata[:, 2] = chart["Unit"].astype(str).to_numpy()
-    fig = go.Figure(
-        go.Bar(
-            x=chart["Percentile"],
-            y=chart["Feature"],
-            orientation="h",
-            marker_color="#3A8688",
-            text=[f"{value:.0%}" for value in chart["Percentile"]],
-            textposition="outside",
-            customdata=customdata,
-            hovertemplate=(
-                "<b>%{y}</b><br>"
-                "Dataset percentile: %{x:.1%}<br>"
-                "Selected value: %{customdata[0]:.2f} %{customdata[2]}<br>"
-                "Dataset median: %{customdata[1]:.2f} %{customdata[2]}<extra></extra>"
-            ),
-        )
-    )
-    fig.add_vline(
-        x=0.5,
-        line_dash="dot",
-        line_width=1.5,
-        line_color=get_active_theme()["line"],
-        annotation_text="Dataset median position",
-        annotation_position="top",
-    )
-    fig.update_layout(
-        title="Selected Numerical Profile — Dataset Percentile Position",
-        xaxis_title="Percentile within cleaned dataset",
-        yaxis_title="",
-        showlegend=False,
-    )
-    fig.update_xaxes(range=[0, 1], tickformat=".0%")
-    return base_plot_layout(fig, 500)
 
 
 # =============================================================================
@@ -4649,16 +4716,11 @@ def key_analytical_insights(df: pd.DataFrame) -> List[Dict[str, str]]:
 def render_model_identity_strip(model_name: str) -> None:
     info = MODEL_INFO[model_name]
     accent = MODEL_ACCENTS.get(model_name, "#0A84FF")
-    role_text = (
-        "Final recommended model"
-        if model_name == "XGBoost"
-        else info["role"]
-    )
     st.markdown(
         f"""
         <div class="model-identity-strip" style="--model-accent:{accent};">
             <div class="model-identity-name">{model_name}</div>
-            <div class="model-identity-subtitle">{info['family']} · {role_text}</div>
+            <div class="model-identity-subtitle">{info['short_description']}</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -4730,130 +4792,29 @@ def render_confusion_summary_card(
     )
 
 
-def plot_model_performance_profile(model_name: str, metrics: Dict[str, float]) -> go.Figure:
-    profile = pd.DataFrame(
-        {
-            "Metric": ["Accuracy", "Weighted F1", "Macro F1", "ROC-AUC"],
-            "Score": [
-                metrics["Accuracy"],
-                metrics["Weighted F1"],
-                metrics["Macro F1"],
-                metrics["ROC-AUC"],
-            ],
-        }
+def render_model_configuration(model_name: str) -> None:
+    lines = MODEL_INFO[model_name]["configuration_lines"]
+    line_html = "".join(
+        f'<div class="model-config-line">{line}</div>'
+        for line in lines
     )
-    profile = profile.sort_values("Score", ascending=True)
-    accent = MODEL_ACCENTS.get(model_name, "#0A84FF")
-    fig = go.Figure(
-        go.Bar(
-            x=profile["Score"],
-            y=profile["Metric"],
-            orientation="h",
-            marker_color=accent,
-            text=[f"{value:.2%}" for value in profile["Score"]],
-            textposition="outside",
-            customdata=np.column_stack([[model_name] * len(profile)]),
-            hovertemplate="<b>%{customdata[0]}</b><br>%{y}: %{x:.2%}<extra></extra>",
-        )
+    st.markdown(
+        f"""
+        <div class="model-config-box">
+            {line_html}
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
-    fig.update_layout(
-        title="Performance Profile",
-        xaxis_title="Score",
-        yaxis_title="",
-        showlegend=False,
-    )
-    fig.update_xaxes(range=[0, 1], tickformat=".0%")
-    return base_plot_layout(fig, 300)
 
 
-def plot_model_generalisation(model_name: str, test_accuracy: float) -> go.Figure:
-    cv = CV_RESULTS[model_name]
-    cv_accuracy = cv["CV Accuracy"]
-    gap = abs(test_accuracy - cv_accuracy)
-    accent = MODEL_ACCENTS.get(model_name, "#0A84FF")
-
-    left = min(cv_accuracy, test_accuracy)
-    right = max(cv_accuracy, test_accuracy)
-
-    fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(
-            x=[left, right],
-            y=[model_name, model_name],
-            mode="lines",
-            line=dict(color="#8E8E93", width=4),
-            hoverinfo="skip",
-            showlegend=False,
-        )
-    )
-    fig.add_trace(
-        go.Scatter(
-            x=[cv_accuracy],
-            y=[model_name],
-            mode="markers+text",
-            name="CV Accuracy",
-            marker=dict(size=13, color=accent, symbol="circle"),
-            text=[f"CV {cv_accuracy:.2%}"],
-            textposition="top center",
-            hovertemplate=(
-                f"<b>{model_name}</b><br>"
-                f"CV Accuracy: {cv_accuracy:.2%}<br>"
-                f"Variation: ±{cv['CV Accuracy Variation']:.2%}"
-                "<extra></extra>"
-            ),
-        )
-    )
-    fig.add_trace(
-        go.Scatter(
-            x=[test_accuracy],
-            y=[model_name],
-            mode="markers+text",
-            name="Held-out Test Accuracy",
-            marker=dict(size=13, color="#6B7F93", symbol="diamond"),
-            text=[f"Test {test_accuracy:.2%}"],
-            textposition="bottom center",
-            hovertemplate=(
-                f"<b>{model_name}</b><br>"
-                f"Held-out Test Accuracy: {test_accuracy:.2%}<br>"
-                f"Absolute gap: {gap:.2%}"
-                "<extra></extra>"
-            ),
-        )
-    )
-    fig.update_layout(
-        title="CV Accuracy vs Held-out Test Accuracy",
-        xaxis_title="Accuracy",
-        yaxis_title="",
-        showlegend=False,
-    )
-    fig.update_xaxes(range=[0, 1], tickformat=".0%")
-    fig.update_yaxes(showticklabels=False)
-    return base_plot_layout(fig, 245)
-
-
-def render_strength_limitation_panels(model_name: str) -> None:
+def render_model_insight(model_name: str) -> None:
     info = MODEL_INFO[model_name]
-    left, right = st.columns(2)
-    with left:
-        st.markdown(
-            f"""
-            <div class="model-text-panel">
-                <div class="model-text-panel-title">Strength</div>
-                <div class="model-text-panel-body">{info['strength']}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-    with right:
-        st.markdown(
-            f"""
-            <div class="model-text-panel">
-                <div class="model-text-panel-title">Limitation</div>
-                <div class="model-text-panel-body">{info['limitation']}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+    render_insight(
+        "Model insight",
+        f"<strong>Strength:</strong> {info['strength']}<br>"
+        f"<strong>Limitation:</strong> {info['limitation']}",
+    )
 
 
 # =============================================================================
@@ -5337,57 +5298,28 @@ def render_model_evaluation_page() -> None:
             ("Weighted F1", f"{metrics['Weighted F1']:.4f}", "Support-weighted"),
             ("Macro F1", f"{metrics['Macro F1']:.4f}", "Equal class weight"),
             ("Weighted OvR ROC-AUC", f"{metrics['ROC-AUC']:.4f}", "Probability discrimination"),
-            ("Errors", f"{int(metrics['Errors'])}", f"{metrics['Error Rate']:.2%} of {int(metrics['Test Size'])}"),
+            ("Errors", f"{int(metrics['Errors'])}", f"{metrics['Error Rate']:.2%} error rate"),
         ]
         for col, (label, value, note) in zip(perf_cols, performance_items):
             with col:
                 render_model_overview_card(label, value, note)
 
-        st.markdown("#### Validation & generalisation")
-        gap = abs(metrics["Accuracy"] - cv["CV Accuracy"])
-        val_cols = st.columns(4)
-        with val_cols[0]:
+        st.markdown("#### Cross-Validation")
+        cv_cols = st.columns(2)
+        with cv_cols[0]:
             render_cv_overview_card(
                 "CV Accuracy",
                 f"{cv['CV Accuracy']:.2%}",
                 f"± {cv['CV Accuracy Variation']:.2%}",
-                "Five-fold validation",
             )
-        with val_cols[1]:
+        with cv_cols[1]:
             render_cv_overview_card(
                 "CV Weighted F1",
                 f"{cv['CV F1']:.2%}",
                 f"± {cv['CV F1 Variation']:.2%}",
-                "Five-fold validation",
-            )
-        with val_cols[2]:
-            render_model_overview_card(
-                "CV ↔ Test Gap",
-                f"{gap * 100:.2f} pp",
-                "Absolute accuracy difference",
-            )
-        with val_cols[3]:
-            render_model_overview_card(
-                "Test Sample",
-                f"{int(metrics['Test Size'])}",
-                "Held-out observations",
             )
 
-        chart_left, chart_right = st.columns([0.58, 0.42])
-        with chart_left:
-            render_plotly(
-                plot_model_performance_profile(model_name, metrics),
-                key=f"overview_profile_{model_name}",
-            )
-        with chart_right:
-            render_plotly(
-                plot_model_generalisation(model_name, metrics["Accuracy"]),
-                key=f"overview_generalisation_{model_name}",
-            )
-
-        render_strength_limitation_panels(model_name)
-
-        st.markdown("#### Class-level summary")
+        st.markdown("#### Class Behaviour")
         summary_cols = st.columns(3)
         with summary_cols[0]:
             render_model_summary_card(
@@ -5409,9 +5341,10 @@ def render_model_evaluation_page() -> None:
                 pair=True,
             )
 
-        with st.expander("Model configuration"):
-            st.markdown(f"**Model family:** {MODEL_INFO[model_name]['family']}")
-            st.markdown(f"**Configuration:** {MODEL_INFO[model_name]['configuration']}")
+        st.markdown('<div class="model-config-spacer"></div>', unsafe_allow_html=True)
+        st.markdown("#### Model Configuration")
+        render_model_configuration(model_name)
+        render_model_insight(model_name)
 
     with tabs[1]:
         mode = st.radio(
@@ -6152,20 +6085,6 @@ def render_prediction_page(clean: Optional[pd.DataFrame] = None) -> None:
             "and should not be interpreted as medical certainty."
         )
 
-    # ------------------------------------------------------------------
-    # Dataset-relative profile view: percentile positions only.
-    # ------------------------------------------------------------------
-    if clean is not None:
-        st.markdown("### Selected Profile vs Dataset Distribution")
-        profile_df = profile_percentile_dataframe(clean, result["inputs"])
-        render_plotly(
-            plot_profile_percentiles(profile_df),
-            key="prediction_profile_percentiles",
-        )
-        st.caption(
-            "Percentiles show the selected numerical values relative to the cleaned dataset for visual comparison only. "
-            "They are not additional model inputs or risk scores."
-        )
 
     st.warning(
         "This prediction tool demonstrates machine-learning classification for academic purposes and should not be treated as a medical diagnosis or medical recommendation."
@@ -6193,8 +6112,15 @@ NAVIGATION_ITEMS = [
     "🔮 Prediction",
 ]
 
-st.sidebar.markdown("## Obesity Analytics")
-st.sidebar.caption("BMDS2003 · Obesity Classification")
+st.sidebar.markdown(
+    """
+    <div class="sidebar-brand">
+        <div class="sidebar-brand-title">Obesity Analytics</div>
+        <div class="sidebar-brand-subtitle">BMDS2003 · Obesity Classification</div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 page = st.sidebar.radio(
     "Navigation",
