@@ -896,6 +896,111 @@ def inject_css() -> None:
                 scroll-behavior: auto !important;
             }
         }
+
+
+        /* =========================================================
+           SYSTEM SIDEBAR — LIGHT MODE
+           Sidebar presentation only; navigation logic is unchanged.
+           ========================================================= */
+
+        [data-testid="stSidebar"] {
+            background: #F2F2F7 !important;
+            border-right: 1px solid rgba(60, 60, 67, 0.10) !important;
+        }
+
+        [data-testid="stSidebar"] > div {
+            background: transparent !important;
+        }
+
+        [data-testid="stSidebar"] h1,
+        [data-testid="stSidebar"] h2,
+        [data-testid="stSidebar"] h3 {
+            color: #1D1D1F !important;
+            letter-spacing: -0.015em;
+        }
+
+        [data-testid="stSidebar"] p,
+        [data-testid="stSidebar"] span {
+            color: #3A3A3C;
+        }
+
+        [data-testid="stSidebar"] [data-testid="stCaptionContainer"],
+        [data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {
+            color: #8E8E93 !important;
+        }
+
+        [data-testid="stSidebar"] hr {
+            border: 0 !important;
+            border-top: 1px solid rgba(60, 60, 67, 0.10) !important;
+            margin: 1rem 0 !important;
+        }
+
+        [data-testid="stSidebar"] div[role="radiogroup"] {
+            gap: 3px;
+        }
+
+        [data-testid="stSidebar"] div[role="radiogroup"] label {
+            min-height: 42px;
+            padding: 0.48rem 0.70rem !important;
+            margin: 2px 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            border-radius: 9px !important;
+            border-left: 3px solid transparent !important;
+            background: transparent !important;
+            color: #3A3A3C !important;
+            transition:
+                background-color 150ms ease,
+                color 150ms ease,
+                border-color 150ms ease !important;
+        }
+
+        [data-testid="stSidebar"] div[role="radiogroup"] label span {
+            color: #3A3A3C !important;
+            font-weight: 500 !important;
+        }
+
+        [data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+            background: rgba(0, 0, 0, 0.045) !important;
+            border-left-color: rgba(0, 122, 255, 0.30) !important;
+            transform: none !important;
+        }
+
+        [data-testid="stSidebar"] div[role="radiogroup"] label:hover span {
+            color: #1D1D1F !important;
+        }
+
+        [data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
+            background: rgba(0, 122, 255, 0.10) !important;
+            border-left-color: #007AFF !important;
+            box-shadow: none !important;
+            transform: none !important;
+        }
+
+        [data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) span {
+            color: #1D1D1F !important;
+            font-weight: 650 !important;
+        }
+
+        [data-testid="stSidebar"] [data-baseweb="select"] > div,
+        [data-testid="stSidebar"] [data-baseweb="input"] {
+            border-radius: 9px !important;
+            border-color: rgba(60, 60, 67, 0.16) !important;
+            background: rgba(255, 255, 255, 0.72) !important;
+            box-shadow: none !important;
+        }
+
+        [data-testid="stSidebar"] [data-baseweb="select"] > div:focus-within,
+        [data-testid="stSidebar"] [data-baseweb="input"]:focus-within {
+            border-color: #007AFF !important;
+            box-shadow: 0 0 0 1px rgba(0, 122, 255, 0.22) !important;
+        }
+
+        [data-testid="stSidebarCollapseButton"],
+        [data-testid="collapsedControl"] {
+            visibility: visible !important;
+            opacity: 1 !important;
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -1017,7 +1122,7 @@ def inject_dark_mode() -> None:
 
 
         /* =========================================================
-           SIDEBAR — macOS STYLE
+           SIDEBAR — SYSTEM STYLE
            ========================================================= */
 
         [data-testid="stSidebar"] {
@@ -1384,14 +1489,19 @@ def inject_dark_mode() -> None:
            ========================================================= */
 
         [data-testid="stFormSubmitButton"] button,
+        [data-testid="stBaseButton-primary"] {
+            background: #0A84FF !important;
+            border: 1px solid #0A84FF !important;
+            color: #FFFFFF !important;
+            -webkit-text-fill-color: #FFFFFF !important;
+            border-radius: 9px !important;
+            box-shadow: none !important;
+        }
+
         [data-testid="stFormSubmitButton"] button *,
-        [data-testid="stBaseButton-primary"],
         [data-testid="stBaseButton-primary"] * {
             color: #FFFFFF !important;
             -webkit-text-fill-color: #FFFFFF !important;
-        }
-            border-radius: 9px !important;
-            box-shadow: none !important;
         }
 
         [data-testid="stBaseButton-primary"]:hover,
@@ -1824,6 +1934,109 @@ def inject_dark_mode() -> None:
             color: #6E6E73 !important;
         }
 
+
+
+        /* =========================================================
+           SYSTEM SIDEBAR — DARK MODE
+           Sidebar presentation only; navigation logic is unchanged.
+           ========================================================= */
+
+        [data-testid="stSidebar"] {
+            background: #242426 !important;
+            border-right: 1px solid rgba(255, 255, 255, 0.07) !important;
+        }
+
+        [data-testid="stSidebar"] > div {
+            background: transparent !important;
+        }
+
+        [data-testid="stSidebar"] h1,
+        [data-testid="stSidebar"] h2,
+        [data-testid="stSidebar"] h3 {
+            color: #F5F5F7 !important;
+        }
+
+        [data-testid="stSidebar"] p {
+            color: #A1A1A6 !important;
+        }
+
+        [data-testid="stSidebar"] [data-testid="stCaptionContainer"],
+        [data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {
+            color: #8E8E93 !important;
+        }
+
+        [data-testid="stSidebar"] hr {
+            border: 0 !important;
+            border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+            margin: 1rem 0 !important;
+        }
+
+        [data-testid="stSidebar"] div[role="radiogroup"] {
+            gap: 3px;
+        }
+
+        [data-testid="stSidebar"] div[role="radiogroup"] label {
+            min-height: 42px;
+            padding: 0.48rem 0.70rem !important;
+            margin: 2px 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            border-radius: 9px !important;
+            border-left: 3px solid transparent !important;
+            background: transparent !important;
+            transition:
+                background-color 150ms ease,
+                color 150ms ease,
+                border-color 150ms ease !important;
+        }
+
+        [data-testid="stSidebar"] div[role="radiogroup"] label span {
+            color: #A1A1A6 !important;
+            font-weight: 500 !important;
+        }
+
+        [data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+            background: rgba(255, 255, 255, 0.055) !important;
+            border-left-color: rgba(10, 132, 255, 0.40) !important;
+            transform: none !important;
+        }
+
+        [data-testid="stSidebar"] div[role="radiogroup"] label:hover span {
+            color: #D1D1D6 !important;
+        }
+
+        [data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
+            background: rgba(255, 255, 255, 0.08) !important;
+            border-left-color: #0A84FF !important;
+            box-shadow: none !important;
+            transform: none !important;
+        }
+
+        [data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) span {
+            color: #F5F5F7 !important;
+            font-weight: 650 !important;
+        }
+
+        [data-testid="stSidebar"] [data-baseweb="select"] > div,
+        [data-testid="stSidebar"] [data-baseweb="input"] {
+            border-radius: 9px !important;
+            border-color: rgba(255, 255, 255, 0.10) !important;
+            background: #2C2C2E !important;
+            color: #F5F5F7 !important;
+            box-shadow: none !important;
+        }
+
+        [data-testid="stSidebar"] [data-baseweb="select"] > div:focus-within,
+        [data-testid="stSidebar"] [data-baseweb="input"]:focus-within {
+            border-color: #0A84FF !important;
+            box-shadow: 0 0 0 1px rgba(10, 132, 255, 0.28) !important;
+        }
+
+        [data-testid="stSidebarCollapseButton"],
+        [data-testid="collapsedControl"] {
+            visibility: visible !important;
+            opacity: 1 !important;
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -2301,20 +2514,39 @@ def plot_numeric_by_class(df: pd.DataFrame, feature: str) -> go.Figure:
     chart_df = df[[TARGET, feature]].copy()
     chart_df["Obesity Category"] = chart_df[TARGET].map(DISPLAY_LABELS)
 
+    hover_formats = {
+        "Age": (".2f", " years"),
+        "Height": (".2f", " m"),
+        "Weight": (".2f", " kg"),
+        "FCVC": (".2f", ""),
+        "NCP": (".2f", ""),
+        "CH2O": (".2f", ""),
+        "FAF": (".2f", ""),
+        "TUE": (".2f", ""),
+    }
+    value_format, unit_suffix = hover_formats.get(feature, (".2f", ""))
+
     fig = go.Figure()
     for cls in OBESITY_ORDER:
         subset = chart_df[chart_df[TARGET] == cls]
+        readable_class = display_label(cls)
         fig.add_trace(
             go.Box(
                 x=subset[feature],
-                y=[display_label(cls)] * len(subset),
-                name=display_label(cls),
+                y=[readable_class] * len(subset),
+                name=readable_class,
                 marker_color=OBESITY_COLORS[cls],
                 line_color=OBESITY_COLORS[cls],
                 boxpoints="outliers",
                 orientation="h",
                 showlegend=False,
-                hovertemplate=f"{feature}: %{{x:.2f}}<extra>{display_label(cls)}</extra>",
+                hoveron="boxes+points",
+                hovertemplate=(
+                    f"<b>{readable_class}</b><br>"
+                    f"Feature: {feature}<br>"
+                    f"Value: %{{x:{value_format}}}{unit_suffix}"
+                    "<extra></extra>"
+                ),
             )
         )
 
@@ -2325,8 +2557,16 @@ def plot_numeric_by_class(df: pd.DataFrame, feature: str) -> go.Figure:
             y=[display_label(c) for c in OBESITY_ORDER],
             mode="markers",
             name="Class mean",
-            marker=dict(symbol="diamond", size=9, color=get_active_theme()["marker_contrast"]),
-            hovertemplate="Mean: %{x:.2f}<extra></extra>",
+            marker=dict(
+                symbol="diamond",
+                size=9,
+                color=get_active_theme()["marker_contrast"],
+            ),
+            hovertemplate=(
+                "<b>%{y}</b><br>"
+                f"Mean {feature}: %{{x:{value_format}}}{unit_suffix}"
+                "<extra></extra>"
+            ),
         )
     )
 
@@ -2334,6 +2574,9 @@ def plot_numeric_by_class(df: pd.DataFrame, feature: str) -> go.Figure:
         title=numeric_question(feature),
         xaxis_title=f"{feature} — {NUMERIC_UNITS[feature]}",
         yaxis_title="",
+        hovermode="closest",
+        hoverdistance=20,
+        spikedistance=-1,
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
     fig.update_yaxes(
@@ -2342,7 +2585,6 @@ def plot_numeric_by_class(df: pd.DataFrame, feature: str) -> go.Figure:
         autorange="reversed",
     )
     return base_plot_layout(fig, 560)
-
 
 def plot_weight_height(df: pd.DataFrame) -> go.Figure:
     chart_df = df.copy()
@@ -2531,13 +2773,77 @@ def get_model_feature_names(model_name: str, model, X_test: Optional[pd.DataFram
     raise AttributeError(f"Feature names are unavailable for {model_name}.")
 
 
-def weighted_ovr_auc(y_true: np.ndarray, y_proba: np.ndarray, classes: np.ndarray) -> float:
-    y_bin = label_binarize(y_true, classes=classes)
+def calculate_multiclass_roc_auc(
+    y_true,
+    y_proba,
+    class_names,
+    average: str = "weighted",
+) -> float:
+    """
+    Calculate multiclass One-vs-Rest ROC-AUC using an explicit class /
+    probability-column order.
+
+    class_names[i] must correspond to y_proba[:, i]. No probability columns
+    are reordered or inferred inside this function.
+    """
+    y_true = np.asarray(y_true).ravel().astype(str)
+    y_proba = np.asarray(y_proba, dtype=float)
+    class_names = np.asarray(class_names).ravel().astype(str)
+
+    if y_proba.ndim > 2:
+        y_proba = np.squeeze(y_proba)
+
+    if y_proba.ndim != 2:
+        raise ValueError(
+            f"Probability array must be 2-D; received shape {y_proba.shape}."
+        )
+
+    if len(y_true) != y_proba.shape[0]:
+        raise ValueError(
+            "ROC-AUC cannot be calculated because y_true length "
+            f"({len(y_true)}) differs from probability rows ({y_proba.shape[0]})."
+        )
+
+    if y_proba.shape[1] != len(class_names):
+        raise ValueError(
+            "Probability-column count does not match class count: "
+            f"{y_proba.shape[1]} columns vs {len(class_names)} classes."
+        )
+
+    if len(np.unique(class_names)) != len(class_names):
+        raise ValueError("class_names contains duplicate class labels.")
+
+    unknown_labels = sorted(set(np.unique(y_true)) - set(class_names))
+    if unknown_labels:
+        raise ValueError(
+            "y_true contains labels outside the probability class order: "
+            + ", ".join(unknown_labels)
+        )
+
+    if not np.isfinite(y_proba).all():
+        raise ValueError("Probability array contains NaN or infinite values.")
+
+    if np.any(y_proba < -1e-9) or np.any(y_proba > 1.0 + 1e-9):
+        raise ValueError("Probability array contains values outside [0, 1].")
+
+    if not np.allclose(
+        y_proba.sum(axis=1),
+        1.0,
+        rtol=1e-5,
+        atol=1e-5,
+    ):
+        raise ValueError("Probability rows do not sum to 1 within tolerance.")
+
+    y_bin = label_binarize(
+        y_true,
+        classes=class_names,
+    )
+
     return float(
         roc_auc_score(
             y_bin,
             y_proba,
-            average="weighted",
+            average=average,
             multi_class="ovr",
         )
     )
@@ -2549,17 +2855,25 @@ def calculate_saved_metrics(
     y_proba: np.ndarray,
     classes: np.ndarray,
 ) -> Dict[str, float]:
+    errors = int(np.sum(y_true != y_pred))
+    test_size = int(len(y_true))
+
     return {
         "Accuracy": float(accuracy_score(y_true, y_pred)),
         "Precision": float(precision_score(y_true, y_pred, average="weighted", zero_division=0)),
         "Recall": float(recall_score(y_true, y_pred, average="weighted", zero_division=0)),
         "Weighted F1": float(f1_score(y_true, y_pred, average="weighted", zero_division=0)),
         "Macro F1": float(f1_score(y_true, y_pred, average="macro", zero_division=0)),
-        "ROC-AUC": weighted_ovr_auc(y_true, y_proba, classes),
-        "Errors": int(np.sum(y_true != y_pred)),
-        "Test Size": int(len(y_true)),
+        "ROC-AUC": calculate_multiclass_roc_auc(
+            y_true,
+            y_proba,
+            classes,
+            average="weighted",
+        ),
+        "Errors": errors,
+        "Error Rate": float(errors / test_size) if test_size else np.nan,
+        "Test Size": test_size,
     }
-
 
 def validate_evaluation_artifacts(
     model_name: str,
@@ -2568,6 +2882,11 @@ def validate_evaluation_artifacts(
     y_proba: np.ndarray,
     classes: np.ndarray,
 ) -> None:
+    y_true = np.asarray(y_true).ravel().astype(str)
+    y_pred = np.asarray(y_pred).ravel().astype(str)
+    y_proba = np.asarray(y_proba, dtype=float)
+    classes = np.asarray(classes).ravel().astype(str)
+
     if y_proba.ndim > 2:
         y_proba = np.squeeze(y_proba)
     if y_proba.ndim != 2:
@@ -2580,13 +2899,18 @@ def validate_evaluation_artifacts(
         raise ValueError(
             f"probability columns ({y_proba.shape[1]}) do not match class count ({len(classes)})"
         )
-    if not np.allclose(y_proba.sum(axis=1), 1.0, atol=1e-4):
+    if len(np.unique(classes)) != len(classes):
+        raise ValueError("model class order contains duplicate labels")
+    if not np.isfinite(y_proba).all():
+        raise ValueError("probability artifact contains NaN or infinite values")
+    if np.any(y_proba < -1e-9) or np.any(y_proba > 1.0 + 1e-9):
+        raise ValueError("probability artifact contains values outside [0, 1]")
+    if not np.allclose(y_proba.sum(axis=1), 1.0, rtol=1e-5, atol=1e-5):
         raise ValueError("probability rows do not sum to 1 within tolerance")
     if not set(np.unique(y_true)).issubset(set(classes)):
         raise ValueError("y_test contains labels outside the model probability class order")
     if not set(np.unique(y_pred)).issubset(set(classes)):
         raise ValueError("saved predictions contain labels outside the model class set")
-
 
 def notebook_match(model_name: str, metrics: Dict[str, float], tolerance: float = 0.0015) -> Tuple[bool, str]:
     expected = NOTEBOOK_TEST_RESULTS.get(model_name)
@@ -2622,29 +2946,105 @@ def load_evaluation_artifact(model_name: str) -> Tuple[Optional[Dict], Optional[
         model = load_model(config["model_path"])
         X_test = load_joblib_data(X_TEST_PATH)
         y_true = np.asarray(load_joblib_data(Y_TEST_PATH)).ravel().astype(str)
-        y_pred = np.asarray(load_joblib_data(config["y_pred_path"])).ravel().astype(str)
-        y_proba = np.asarray(load_joblib_data(config["y_proba_path"]), dtype=float)
-        if y_proba.ndim > 2:
-            y_proba = np.squeeze(y_proba)
+        saved_y_pred = np.asarray(load_joblib_data(config["y_pred_path"])).ravel().astype(str)
+        saved_y_proba = np.asarray(load_joblib_data(config["y_proba_path"]), dtype=float)
+        if saved_y_proba.ndim > 2:
+            saved_y_proba = np.squeeze(saved_y_proba)
+
+        # For sklearn classifiers/pipelines, classes_ defines predict_proba column order.
+        # XGBoost retains the fixed LabelEncoder mapping from the executed notebook.
         classes = get_model_classes(model_name, model)
-        validate_evaluation_artifacts(model_name, y_true, y_pred, y_proba, classes)
-        metrics = calculate_saved_metrics(y_true, y_pred, y_proba, classes)
+
+        validate_evaluation_artifacts(
+            model_name,
+            y_true,
+            saved_y_pred,
+            saved_y_proba,
+            classes,
+        )
+
+        # Preserve the project's saved evaluation artifacts as the displayed metric source.
+        # They are not overwritten, reordered, retrained or modified here.
+        metrics = calculate_saved_metrics(
+            y_true,
+            saved_y_pred,
+            saved_y_proba,
+            classes,
+        )
+
         matches, match_message = notebook_match(model_name, metrics)
+
+        # Independent deployment consistency check. This does not replace the saved
+        # artifacts; it only tests whether they came from the currently loaded model.
+        model_reproduction_available = False
+        model_reproduction_error = None
+        saved_prediction_match = None
+        saved_probability_match = None
+        model_metrics = None
+
+        try:
+            model_pred_raw = np.asarray(model.predict(X_test)).ravel()
+            model_proba = np.asarray(model.predict_proba(X_test), dtype=float)
+            if model_proba.ndim > 2:
+                model_proba = np.squeeze(model_proba)
+
+            if model_name == "XGBoost":
+                raw_as_str = model_pred_raw.astype(str)
+                if set(np.unique(raw_as_str)).issubset(set(XGB_CLASS_NAMES)):
+                    model_pred = raw_as_str
+                else:
+                    model_pred = XGB_CLASS_NAMES[model_pred_raw.astype(int)].astype(str)
+            else:
+                model_pred = model_pred_raw.astype(str)
+
+            validate_evaluation_artifacts(
+                model_name,
+                y_true,
+                model_pred,
+                model_proba,
+                classes,
+            )
+
+            saved_prediction_match = bool(
+                np.array_equal(saved_y_pred, model_pred)
+            )
+            saved_probability_match = bool(
+                np.allclose(
+                    saved_y_proba,
+                    model_proba,
+                    rtol=1e-7,
+                    atol=1e-9,
+                )
+            )
+            model_metrics = calculate_saved_metrics(
+                y_true,
+                model_pred,
+                model_proba,
+                classes,
+            )
+            model_reproduction_available = True
+
+        except Exception as reproduction_exc:
+            model_reproduction_error = str(reproduction_exc)
 
         return {
             "model": model,
             "X_test": X_test,
             "y_true": y_true,
-            "y_pred": y_pred,
-            "y_proba": y_proba,
+            "y_pred": saved_y_pred,
+            "y_proba": saved_y_proba,
             "classes": classes,
             "metrics": metrics,
             "notebook_match": matches,
             "notebook_match_message": match_message,
+            "model_reproduction_available": model_reproduction_available,
+            "model_reproduction_error": model_reproduction_error,
+            "saved_prediction_match": saved_prediction_match,
+            "saved_probability_match": saved_probability_match,
+            "model_metrics": model_metrics,
         }, None
     except Exception as exc:
         return None, f"Could not load/validate {model_name} evaluation artifacts: {exc}"
-
 
 def get_cv_dataframe() -> Tuple[pd.DataFrame, str]:
     if Path(CV_RESULTS_CSV).exists():
@@ -2673,17 +3073,53 @@ def build_comparison_dataframe() -> Tuple[pd.DataFrame, Dict[str, Dict], List[st
             artifacts[model_name] = artifact
             row = {"Model": model_name, **artifact["metrics"], "Metric Source": "Saved artifacts"}
             rows.append(row)
+
+            if artifact["model_reproduction_available"]:
+                if not artifact["saved_prediction_match"] or not artifact["saved_probability_match"]:
+                    differences = []
+                    if not artifact["saved_prediction_match"]:
+                        differences.append("saved y_pred differs from the loaded model")
+                    if not artifact["saved_probability_match"]:
+                        differences.append("saved y_pred_proba differs from the loaded model")
+                    warnings.append(
+                        f"{model_name}: " + "; ".join(differences) + ". "
+                        "The saved evaluation files may originate from a different model/export version."
+                    )
+            elif artifact["model_reproduction_error"]:
+                warnings.append(
+                    f"{model_name}: loaded-model reproduction check could not be completed: "
+                    f"{artifact['model_reproduction_error']}"
+                )
+
             if not artifact["notebook_match"]:
-                warnings.append(f"{model_name}: {artifact['notebook_match_message']}")
+                if (
+                    artifact["model_reproduction_available"]
+                    and artifact["saved_prediction_match"]
+                    and artifact["saved_probability_match"]
+                ):
+                    warnings.append(
+                        f"{model_name}: the saved evaluation artifacts reproduce the currently loaded model, "
+                        f"but they do not reproduce the executed notebook reference — "
+                        f"{artifact['notebook_match_message']}. "
+                        "This indicates a deployment/export version difference rather than a change made by the dashboard."
+                    )
+                else:
+                    warnings.append(
+                        f"{model_name}: saved evaluation artifacts do not reproduce the executed notebook reference — "
+                        f"{artifact['notebook_match_message']}. "
+                        "They may originate from a different model, preprocessing, or test export."
+                    )
         else:
             # Presentation fallback: use executed-notebook reference values only, clearly labelled.
             expected = NOTEBOOK_TEST_RESULTS.get(model_name)
             if expected:
+                test_size = 627
                 rows.append(
                     {
                         "Model": model_name,
                         **expected,
-                        "Test Size": 627,
+                        "Error Rate": float(expected["Errors"] / test_size),
+                        "Test Size": test_size,
                         "Metric Source": "Executed notebook reference",
                     }
                 )
@@ -2692,14 +3128,11 @@ def build_comparison_dataframe() -> Tuple[pd.DataFrame, Dict[str, Dict], List[st
     comparison = pd.DataFrame(rows)
     cv_df, cv_source = get_cv_dataframe()
     if not comparison.empty:
+        if "Error Rate" not in comparison.columns:
+            comparison["Error Rate"] = comparison["Errors"] / comparison["Test Size"]
         comparison = comparison.merge(cv_df, on="Model", how="left")
     comparison.attrs["cv_source"] = cv_source
     return comparison, artifacts, warnings
-
-
-# =============================================================================
-# MODEL EVALUATION VISUALISATIONS
-# =============================================================================
 
 def confusion_details(artifact: Dict) -> Dict:
     cm = confusion_matrix(
@@ -3712,7 +4145,11 @@ def render_model_evaluation_page() -> None:
     if artifact["notebook_match"]:
         st.success("Artifact integrity check: saved held-out metrics match the executed notebook reference values within rounding tolerance.")
     else:
-        st.warning("Artifact/notebook mismatch detected: " + artifact["notebook_match_message"])
+        st.warning(
+            "Saved evaluation artifacts do not reproduce the executed notebook reference: "
+            + artifact["notebook_match_message"]
+            + ". The dashboard is reporting the loaded saved artifacts without forcing the notebook value."
+        )
 
     tabs = st.tabs(["Overview", "Confusion Matrix", "Class Performance", "ROC", "Feature Analysis"])
 
@@ -3826,14 +4263,137 @@ def render_model_comparison_page() -> None:
             for warning in warnings:
                 st.write("• " + warning)
 
+    # ============================================================
+    # INTERACTIVE MODEL RANKING
+    # ============================================================
+    comparison = comparison.copy()
+    if "Error Rate" not in comparison.columns:
+        comparison["Error Rate"] = comparison["Errors"] / comparison["Test Size"]
+
+    ranking_options = {
+        "Weighted F1": {"column": "Weighted F1", "ascending": False, "direction": "Higher is better"},
+        "Macro F1": {"column": "Macro F1", "ascending": False, "direction": "Higher is better"},
+        "Accuracy": {"column": "Accuracy", "ascending": False, "direction": "Higher is better"},
+        "Precision": {"column": "Precision", "ascending": False, "direction": "Higher is better"},
+        "Recall": {"column": "Recall", "ascending": False, "direction": "Higher is better"},
+        "ROC-AUC": {"column": "ROC-AUC", "ascending": False, "direction": "Higher is better"},
+        "Error Rate": {"column": "Error Rate", "ascending": True, "direction": "Lower is better"},
+    }
+
     ranking_metric = st.selectbox(
-        "Rank models by",
-        ["Weighted F1", "Macro F1", "Accuracy", "ROC-AUC"],
+        "Rank Models By",
+        list(ranking_options.keys()),
         index=0,
         key="ranking_metric",
     )
-    ranked = comparison.sort_values(ranking_metric, ascending=False).reset_index(drop=True).copy()
-    ranked["Rank"] = np.arange(1, len(ranked) + 1)
+
+    rank_cfg = ranking_options[ranking_metric]
+    rank_column = rank_cfg["column"]
+    ascending = rank_cfg["ascending"]
+
+    # Stable secondary tie-breakers only determine row order. Models that are
+    # identical at the displayed four-decimal precision share the same rank.
+    tie_columns = list(dict.fromkeys([rank_column, "Weighted F1", "Accuracy", "ROC-AUC"]))
+    tie_ascending = [ascending if col == rank_column else False for col in tie_columns]
+
+    ranked = (
+        comparison.sort_values(
+            by=tie_columns,
+            ascending=tie_ascending,
+            kind="stable",
+        )
+        .reset_index(drop=True)
+        .copy()
+    )
+
+    displayed_metric = ranked[rank_column].round(4)
+    score_order = sorted(displayed_metric.unique(), reverse=not ascending)
+    display_rank_map = {value: position + 1 for position, value in enumerate(score_order)}
+    ranked["Rank"] = displayed_metric.map(display_rank_map).astype(int)
+
+    best_value = float(ranked.iloc[0][rank_column])
+    if ascending:
+        ranked["Gap from Best"] = ranked[rank_column] - best_value
+    else:
+        ranked["Gap from Best"] = best_value - ranked[rank_column]
+
+    top_display_value = round(best_value, 4)
+    tied_models = ranked.loc[
+        ranked[rank_column].round(4) == top_display_value,
+        "Model",
+    ].tolist()
+    leader_text = " / ".join(tied_models)
+
+    st.caption(
+        f"{rank_cfg['direction']}. Weighted F1 is the default because it balances precision "
+        "and recall while accounting for class support; it is not treated as universally superior."
+    )
+
+    leader_value = f"{best_value:.2%}" if ranking_metric == "Error Rate" else f"{best_value:.4f}"
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.metric(f"Highest Ranked by {ranking_metric}", leader_text)
+    with c2:
+        st.metric(ranking_metric, leader_value)
+    with c3:
+        st.metric("Ranking Direction", rank_cfg["direction"])
+
+    scorecard_items = []
+    for _, row in ranked.iterrows():
+        metric_value = (
+            f"{row[rank_column]:.2%}"
+            if ranking_metric == "Error Rate"
+            else f"{row[rank_column]:.4f}"
+        )
+        gap_value = (
+            f"{row['Gap from Best']:.2%}"
+            if ranking_metric == "Error Rate"
+            else f"{row['Gap from Best']:.4f}"
+        )
+        scorecard_items.append(
+            (
+                f"Rank #{int(row['Rank'])} · {row['Model']}",
+                metric_value,
+                f"Gap from best: {gap_value}",
+            )
+        )
+    render_kpi_grid(scorecard_items, columns_per_row=4)
+
+    chart_ranked = ranked.sort_values(
+        rank_column,
+        ascending=not ascending,
+    ).copy()
+
+    if ranking_metric == "Error Rate":
+        chart_text = chart_ranked[rank_column].map(lambda value: f"{value:.2%}")
+        chart_hover = "<b>%{y}</b><br>Error Rate: %{x:.2%}<extra></extra>"
+    else:
+        chart_text = chart_ranked[rank_column].map(lambda value: f"{value:.4f}")
+        chart_hover = f"<b>%{{y}}</b><br>{ranking_metric}: %{{x:.4f}}<extra></extra>"
+
+    ranking_fig = go.Figure(
+        go.Bar(
+            x=chart_ranked[rank_column],
+            y=chart_ranked["Model"],
+            orientation="h",
+            marker_color=[MODEL_COLORS.get(model, "#6B7F93") for model in chart_ranked["Model"]],
+            text=chart_text,
+            textposition="outside",
+            hovertemplate=chart_hover,
+        )
+    )
+    ranking_fig.update_layout(
+        title=f"Model Ranking by {ranking_metric}",
+        xaxis_title=ranking_metric,
+        yaxis_title="",
+        showlegend=False,
+    )
+    if ranking_metric == "Error Rate":
+        ranking_fig.update_xaxes(tickformat=".0%")
+    else:
+        ranking_fig.update_xaxes(range=[0, 1])
+    ranking_fig.update_yaxes(categoryorder="array", categoryarray=chart_ranked["Model"].tolist())
+    st.plotly_chart(base_plot_layout(ranking_fig, 420), use_container_width=True)
 
     st.markdown("### Model ranking table")
     ranking_display = ranked[
@@ -3841,9 +4401,13 @@ def render_model_comparison_page() -> None:
             "Rank",
             "Model",
             "Accuracy",
+            "Precision",
+            "Recall",
             "Weighted F1",
             "Macro F1",
             "ROC-AUC",
+            "Error Rate",
+            "Gap from Best",
             "Errors",
             "CV Accuracy",
             "CV Accuracy Std",
@@ -3852,24 +4416,69 @@ def render_model_comparison_page() -> None:
             "Metric Source",
         ]
     ].copy()
+
+    formatters = {
+        "Accuracy": "{:.4f}",
+        "Precision": "{:.4f}",
+        "Recall": "{:.4f}",
+        "Weighted F1": "{:.4f}",
+        "Macro F1": "{:.4f}",
+        "ROC-AUC": "{:.4f}",
+        "Error Rate": "{:.2%}",
+        "CV Accuracy": "{:.4f}",
+        "CV Accuracy Std": "{:.4f}",
+        "CV F1": "{:.4f}",
+        "CV F1 Std": "{:.4f}",
+        "Gap from Best": "{:.2%}" if ranking_metric == "Error Rate" else "{:.4f}",
+    }
     st.dataframe(
-        ranking_display.style.format(
-            {
-                "Accuracy": "{:.4f}",
-                "Weighted F1": "{:.4f}",
-                "Macro F1": "{:.4f}",
-                "ROC-AUC": "{:.4f}",
-                "CV Accuracy": "{:.4f}",
-                "CV Accuracy Std": "{:.4f}",
-                "CV F1": "{:.4f}",
-                "CV F1 Std": "{:.4f}",
-            }
-        ),
+        ranking_display.style.format(formatters),
         use_container_width=True,
         hide_index=True,
     )
+
+    if len(tied_models) > 1:
+        ranking_text = (
+            f"{', '.join(tied_models)} share first place by {ranking_metric} at the displayed "
+            "four-decimal precision. Secondary tie-breakers are used only to keep row ordering stable."
+        )
+    elif ranking_metric == "Weighted F1":
+        ranking_text = (
+            f"{leader_text} ranks first by Weighted F1. This metric balances precision and recall "
+            "while accounting for class support."
+        )
+    elif ranking_metric == "Macro F1":
+        ranking_text = (
+            f"{leader_text} ranks first by Macro F1, which gives each obesity class equal weight."
+        )
+    elif ranking_metric == "Accuracy":
+        ranking_text = (
+            f"{leader_text} ranks first by Accuracy, representing the largest overall share of "
+            "correctly classified held-out observations."
+        )
+    elif ranking_metric == "Precision":
+        ranking_text = (
+            f"{leader_text} ranks first by weighted Precision across the seven classes."
+        )
+    elif ranking_metric == "Recall":
+        ranking_text = (
+            f"{leader_text} ranks first by weighted Recall across the seven classes."
+        )
+    elif ranking_metric == "ROC-AUC":
+        ranking_text = (
+            f"{leader_text} ranks first by Weighted One-vs-Rest ROC-AUC, indicating the strongest "
+            "probability discrimination under this metric."
+        )
+    else:
+        ranking_text = (
+            f"{leader_text} ranks first under Error Rate because it produced the lowest proportion "
+            "of misclassified held-out observations."
+        )
+
+    render_insight("Ranking insight", ranking_text)
     st.caption(
-        "Default ranking uses Weighted F1 because it balances precision and recall while respecting class support. The final recommendation below does not rely on this single metric alone."
+        "The interactive ranking changes only this comparison view. The project's final model "
+        "recommendation below remains based on the broader multi-metric evidence used in the project."
     )
 
     st.markdown("### Performance comparison")
