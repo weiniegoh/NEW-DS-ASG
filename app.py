@@ -607,7 +607,7 @@ def inject_css() -> None:
 
         .block-container {
             max-width: 1450px;
-            padding-top: 1.4rem;
+            padding-top: 1rem;
             padding-bottom: 2rem;
             animation: appFadeUp .55s ease;
         }
