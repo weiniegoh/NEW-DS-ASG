@@ -1147,35 +1147,6 @@ def inject_css() -> None:
             margin-bottom: 8px;
         }
 
-        .sidebar-snapshot-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-        }
-
-        .sidebar-snapshot-cell {
-            padding: 7px 8px;
-            border-radius: 9px;
-            background: rgba(255,255,255,.52);
-            border: 1px solid rgba(60,60,67,.07);
-        }
-
-        .sidebar-snapshot-value {
-            color: #1D1D1F;
-            font-size: 1.05rem;
-            font-weight: 760;
-            line-height: 1.1;
-        }
-
-        .sidebar-snapshot-label,
-        .sidebar-context-line,
-        .sidebar-active-metric,
-        .sidebar-dataset-line {
-            color: #8E8E93;
-            font-size: .69rem;
-            line-height: 1.3;
-        }
-
         .sidebar-active-name {
             color: #1D1D1F;
             font-size: .88rem;
@@ -1823,23 +1794,6 @@ def inject_dark_mode() -> None:
             box-shadow: none !important;
         }
 
-        .sidebar-snapshot-cell {
-            background: #323234 !important;
-            border-color: rgba(255,255,255,.06) !important;
-        }
-
-        .sidebar-mini-title,
-        .sidebar-snapshot-value,
-        .sidebar-active-name {
-            color: #F5F5F7 !important;
-        }
-
-        .sidebar-snapshot-label,
-        .sidebar-context-line,
-        .sidebar-active-metric,
-        .sidebar-dataset-line {
-            color: #8E8E93 !important;
-        }
 
         /* =========================================================
            DARK MODE TYPOGRAPHY COLOUR HIERARCHY
@@ -2423,37 +2377,6 @@ def scroll_main_view_to_top() -> None:
         height=0,
         width=0,
     )
-
-
-def render_sidebar_snapshot(clean: Optional[pd.DataFrame]) -> None:
-    records = len(clean) if clean is not None else 2087
-    st.sidebar.markdown(
-        f"""
-        <div class="sidebar-mini-card">
-            <div class="sidebar-mini-title">Project Snapshot</div>
-            <div class="sidebar-snapshot-grid">
-                <div class="sidebar-snapshot-cell">
-                    <div class="sidebar-snapshot-value">{records:,}</div>
-                    <div class="sidebar-snapshot-label">Clean records</div>
-                </div>
-                <div class="sidebar-snapshot-cell">
-                    <div class="sidebar-snapshot-value">16</div>
-                    <div class="sidebar-snapshot-label">Predictors</div>
-                </div>
-                <div class="sidebar-snapshot-cell">
-                    <div class="sidebar-snapshot-value">7</div>
-                    <div class="sidebar-snapshot-label">Target classes</div>
-                </div>
-                <div class="sidebar-snapshot-cell">
-                    <div class="sidebar-snapshot-value">4</div>
-                    <div class="sidebar-snapshot-label">ML models</div>
-                </div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
 
 def selected_sidebar_model(page: str) -> Optional[str]:
     if page == "🧪 Model Evaluation":
@@ -5538,7 +5461,6 @@ page = st.sidebar.radio(
 page_did_change = main_page_changed(page)
 
 render_sidebar_context(page, NAVIGATION_ITEMS)
-render_sidebar_snapshot(clean)
 render_sidebar_active_model(page)
 
 st.sidebar.markdown("---")
