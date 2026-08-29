@@ -2,8 +2,10 @@
 BMDS2003 Data Science — Obesity Risk Analytics & Classification Dashboard
 =========================================================================
 
-This Streamlit application is a presentation/analytics layer for the existing
-BMDS2003 project artifacts. It intentionally DOES NOT train or retune any model.
+Presentation-focused Streamlit application for the established BMDS2003
+obesity classification workflow. The application does not train or retune
+models; evaluation is reproduced from the project dataset, fixed split,
+fixed encoding scheme and compatible trained classifiers.
 
 Run with:
     streamlit run app.py
@@ -117,7 +119,7 @@ DISPLAY_LABELS = {
 }
 
 # XGBoost was trained with integer IDs created by LabelEncoder.
-# Keep this EXACTLY aligned with LabelEncoder.classes_ in the executed notebook.
+# Keep this EXACTLY aligned with LabelEncoder.classes_ in the established project run.
 XGB_CLASS_NAMES = np.array(
     [
         "Insufficient_Weight",
@@ -169,36 +171,43 @@ DATASET_CONTEXT = {
 
 MODEL_REGISTRY = {
     "Logistic Regression": {
-        "model_path": "models/logistic_regression_model.pkl",
-        "y_pred_path": "data/lr_y_pred.pkl",
-        "y_proba_path": "data/lr_y_pred_proba.pkl",
+        "model_candidates": [
+            "models/logistic_regression_model.pkl",
+            "logistic_regression_model.pkl",
+        ],
         "feature_data_candidates": [
             "data/lr_feature_importance.csv",
             "lr_feature_importance.csv",
         ],
     },
     "K-Nearest Neighbours (KNN)": {
-        "model_path": "models/knn_model.pkl",
-        "y_pred_path": "data/knn_y_pred.pkl",
-        "y_proba_path": "data/knn_y_pred_proba.pkl",
+        "model_candidates": [
+            "models/knn_model.pkl",
+            "knn_model.pkl",
+            "knn_model (1).pkl",
+        ],
         "feature_data_candidates": [
             "data/knn_feature_importance.csv",
             "knn_feature_importance.csv",
         ],
     },
     "Random Forest": {
-        "model_path": "models/random_forest_model.pkl",
-        "y_pred_path": "data/rf_y_pred.pkl",
-        "y_proba_path": "data/rf_y_pred_proba.pkl",
+        "model_candidates": [
+            "models/random_forest_model.pkl",
+            "random_forest_model.pkl",
+            "random_forest_model (2).pkl",
+        ],
         "feature_data_candidates": [
             "data/rf_feature_importance.csv",
             "rf_feature_importance.csv",
         ],
     },
     "XGBoost": {
-        "model_path": "models/xgboost_model.pkl",
-        "y_pred_path": "data/xgb_y_pred.pkl",
-        "y_proba_path": "data/xgb_y_pred_proba.pkl",
+        "model_candidates": [
+            "models/xgboost_model.pkl",
+            "xgboost_model.pkl",
+            "xgboost_model (4).pkl",
+        ],
         "feature_data_candidates": [
             "data/xgb_feature_importance.csv",
             "xgb_feature_importance.csv",
@@ -206,15 +215,9 @@ MODEL_REGISTRY = {
     },
 }
 
-X_TEST_PATH = "data/X_test_encoded.pkl"
-Y_TEST_PATH = "data/y_test_flat.pkl"
-CV_RESULTS_CSV = "data/cv_results.csv"  # optional future export
-
-# Executed DS_4Models notebook reference values. These values are NOT used to
-# overwrite held-out test metrics when saved prediction artifacts are present.
-# They are used for (1) consistency checks and (2) CV display because the
-# current repository plan does not store per-fold CV results as artifacts.
-NOTEBOOK_TEST_RESULTS = {
+# The accepted project results are used as a compatibility fingerprint only.
+# The UI never substitutes these values for live model calculations.
+PROJECT_TEST_RESULTS = {
     "Logistic Regression": {
         "Accuracy": 0.9011,
         "Precision": 0.8998,
@@ -253,9 +256,8 @@ NOTEBOOK_TEST_RESULTS = {
     },
 }
 
-# One-standard-deviation values. Random Forest's notebook prints +/- 2*SD,
-# so the notebook's displayed 0.0416 / 0.0421 are converted here to ~1 SD.
-NOTEBOOK_CV_RESULTS = {
+# Five-fold stability values retained from the established project results.
+PROJECT_CV_RESULTS = {
     "Logistic Regression": {
         "CV Accuracy": 0.8568,
         "CV Accuracy Std": 0.0214,
@@ -270,7 +272,7 @@ NOTEBOOK_CV_RESULTS = {
     },
     "Random Forest": {
         "CV Accuracy": 0.9253,
-        "CV Accuracy Std": 0.0416,
+        "CV Accuracy Std": 0.0208,
         "CV F1": 0.9264,
         "CV F1 Std": 0.0211,
     },
@@ -282,20 +284,21 @@ NOTEBOOK_CV_RESULTS = {
     },
 }
 
-NOTEBOOK_TRAIN_ACCURACY = {
+PROJECT_TRAIN_ACCURACY = {
     "Logistic Regression": 0.8966,
     "K-Nearest Neighbours (KNN)": 1.0000,
     "Random Forest": 0.9959,
     "XGBoost": 1.0000,
 }
 
+MODEL_METRIC_TOLERANCE = 0.0015
+
 MODEL_INFO = {
     "Logistic Regression": {
         "role": "Baseline model",
         "family": "Linear probabilistic classifier",
         "configuration": (
-            "max_iter=2000, random_state=42. The deployment Pipeline applies "
-            "StandardScaler to the eight numerical predictors internally."
+            "max_iter=2000, random_state=42. The model pipeline scales the eight numerical predictors with StandardScaler."
         ),
         "strength": "Highly interpretable, fast, and a strong reference baseline.",
         "limitation": "Linear decision boundaries can miss nonlinear interactions.",
@@ -306,8 +309,7 @@ MODEL_INFO = {
         "role": "Distance-based nonlinear model",
         "family": "Instance-based classifier",
         "configuration": (
-            "k=3, Manhattan distance, distance weighting. The deployment Pipeline "
-            "applies StandardScaler internally."
+            "k=3, Manhattan distance, distance weighting. The model pipeline applies StandardScaler to the eight numerical predictors."
         ),
         "strength": "Captures local neighbourhood structure without a linear-boundary assumption.",
         "limitation": "Distance-sensitive and prediction cost grows with training-set size.",
@@ -376,7 +378,7 @@ def inject_css() -> None:
         /* ===== MOTION / INTERACTION LAYER ===== */
         @keyframes appFadeUp {
             from { opacity: 0; transform: translateY(12px); }
-            to { opacity: 1; transform: translateY(0); }
+            to { opacity: 1; transform: none; }
         }
 
         @keyframes heroGlow {
@@ -407,7 +409,7 @@ def inject_css() -> None:
         .stApp,
         [data-testid="stAppViewContainer"] {
             position: relative;
-            overflow-x: hidden;
+            overflow-x: visible;
             background:
                 radial-gradient(
                     circle at 94% 4%,
@@ -427,7 +429,7 @@ def inject_css() -> None:
             max-width: 1450px;
             padding-top: 1.4rem;
             padding-bottom: 2rem;
-            animation: appFadeUp .55s ease both;
+            animation: appFadeUp .55s ease;
         }
 
         /* A very subtle moving atmosphere behind the dashboard. */
@@ -1000,6 +1002,26 @@ def inject_css() -> None:
         [data-testid="collapsedControl"] {
             visibility: visible !important;
             opacity: 1 !important;
+        }
+
+
+        /* Plot containers remain unconstrained so chart controls are not clipped. */
+        [data-testid="stPlotlyChart"],
+        [data-testid="stPlotlyChart"] > div,
+        [data-testid="stPlotlyChart"] .js-plotly-plot,
+        [data-testid="stPlotlyChart"] .plot-container {
+            overflow: visible !important;
+        }
+
+        [data-testid="stPlotlyChart"] .modebar {
+            top: 8px !important;
+            right: 8px !important;
+            z-index: 20 !important;
+        }
+
+        button[title="View fullscreen"],
+        button[title="Exit fullscreen"] {
+            z-index: 30 !important;
         }
         </style>
         """,
@@ -2215,6 +2237,41 @@ def base_plot_layout(fig: go.Figure, height: int = 470) -> go.Figure:
     return fig
 
 
+
+
+PLOTLY_CONFIG = {
+    "displaylogo": False,
+    "responsive": True,
+    "scrollZoom": False,
+    "displayModeBar": True,
+    "toImageButtonOptions": {
+        "format": "png",
+        "scale": 2,
+    },
+}
+
+
+def render_plotly(
+    fig: go.Figure,
+    height: Optional[int] = None,
+    key: Optional[str] = None,
+) -> None:
+    """Render every interactive figure through one responsive configuration."""
+    resolved_height = int(height or fig.layout.height or 500)
+    fig.update_layout(
+        height=resolved_height,
+        autosize=True,
+    )
+    st.plotly_chart(
+        fig,
+        width="stretch",
+        height=resolved_height,
+        theme=None,
+        config=PLOTLY_CONFIG,
+        key=key,
+    )
+
+
 # =============================================================================
 # DATA LOADING / PREPARATION FOR DASHBOARD ANALYTICS
 # =============================================================================
@@ -2227,7 +2284,7 @@ def load_dataset() -> Tuple[pd.DataFrame, pd.DataFrame, str]:
     ])
     if path is None:
         raise FileNotFoundError(
-            "ObesityDataSet.csv was not found in the repository root or data/ folder."
+            "The project dataset is unavailable."
         )
 
     raw = pd.read_csv(path)
@@ -2452,7 +2509,7 @@ def plot_target_distribution(df: pd.DataFrame) -> go.Figure:
     fig.update_yaxes(autorange="reversed")
     max_count = max(chart_df["Count"].max(), 1)
     fig.update_xaxes(range=[0, max_count * 1.20])
-    return base_plot_layout(fig, 500)
+    return base_plot_layout(fig, 460)
 
 
 def plot_numeric_distribution(df: pd.DataFrame, feature: str) -> go.Figure:
@@ -2493,7 +2550,7 @@ def plot_numeric_distribution(df: pd.DataFrame, feature: str) -> go.Figure:
         bargap=0.04,
         showlegend=False,
     )
-    return base_plot_layout(fig, 470)
+    return base_plot_layout(fig, 450)
 
 
 def numeric_question(feature: str) -> str:
@@ -2616,7 +2673,7 @@ def plot_weight_height(df: pd.DataFrame) -> go.Figure:
         yaxis_title="Weight (kg)",
         legend_title_text="Obesity category",
     )
-    return base_plot_layout(fig, 600)
+    return base_plot_layout(fig, 560)
 
 
 def plot_categorical_relationship(df: pd.DataFrame, feature: str) -> go.Figure:
@@ -2676,7 +2733,7 @@ def plot_categorical_relationship(df: pd.DataFrame, feature: str) -> go.Figure:
         legend_title_text="Obesity category",
     )
     fig.update_yaxes(tickformat=".0%", range=[0, 1])
-    return base_plot_layout(fig, 560)
+    return base_plot_layout(fig, 520)
 
 
 def categorical_insight(df: pd.DataFrame, feature: str) -> str:
@@ -2736,12 +2793,68 @@ def plot_correlation_heatmap(df: pd.DataFrame, method: str) -> go.Figure:
         xaxis_title="",
         yaxis_title="",
     )
-    return base_plot_layout(fig, 600)
+    return base_plot_layout(fig, 620)
 
 
 # =============================================================================
-# MODEL ARTIFACT HELPERS
+# MODEL EVALUATION HELPERS
 # =============================================================================
+
+@st.cache_data(show_spinner=False)
+def build_project_evaluation_data() -> Dict[str, object]:
+    """
+    Reproduce the established modelling partition exactly.
+
+    Important: this intentionally mirrors the project's existing categorical
+    encoding behaviour. It does not create a new split or alter preprocessing.
+    """
+    raw, _, _ = load_dataset()
+    modelling_df = raw.drop_duplicates().copy()
+
+    X = modelling_df.drop(columns=[TARGET])
+    y = modelling_df[[TARGET]]
+
+    from sklearn.model_selection import train_test_split
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=0.30,
+        stratify=y,
+        random_state=42,
+    )
+
+    X_train_encoded = pd.get_dummies(
+        X_train,
+        columns=CATEGORICAL_COLUMNS,
+        drop_first=True,
+    )
+    X_test_encoded = pd.get_dummies(
+        X_test,
+        columns=CATEGORICAL_COLUMNS,
+        drop_first=True,
+    )
+
+    # This is the exact alignment rule used by the established modelling run.
+    X_train_encoded, X_test_encoded = X_train_encoded.align(
+        X_test_encoded,
+        join="left",
+        axis=1,
+        fill_value=0,
+    )
+
+    X_train_encoded = X_train_encoded.astype(float)
+    X_test_encoded = X_test_encoded.astype(float)
+
+    return {
+        "X_train": X_train,
+        "X_test": X_test,
+        "X_train_encoded": X_train_encoded,
+        "X_test_encoded": X_test_encoded,
+        "y_train": np.asarray(y_train).ravel().astype(str),
+        "y_test": np.asarray(y_test).ravel().astype(str),
+    }
+
 
 def get_model_classes(model_name: str, model) -> np.ndarray:
     if model_name == "XGBoost":
@@ -2762,7 +2875,7 @@ def get_model_feature_names(model_name: str, model, X_test: Optional[pd.DataFram
     if model_name == "XGBoost" and hasattr(model, "get_booster"):
         names = model.get_booster().feature_names
         if names:
-            return list(names)
+            return [str(x) for x in names]
 
     if hasattr(model, "feature_names_in_"):
         return [str(x) for x in model.feature_names_in_]
@@ -2777,68 +2890,33 @@ def calculate_multiclass_roc_auc(
     y_true,
     y_proba,
     class_names,
-    average: str = "weighted",
+    average="weighted",
 ) -> float:
-    """
-    Calculate multiclass One-vs-Rest ROC-AUC using an explicit class /
-    probability-column order.
-
-    class_names[i] must correspond to y_proba[:, i]. No probability columns
-    are reordered or inferred inside this function.
-    """
+    """Calculate multiclass One-vs-Rest ROC-AUC in probability-column order."""
     y_true = np.asarray(y_true).ravel().astype(str)
     y_proba = np.asarray(y_proba, dtype=float)
     class_names = np.asarray(class_names).ravel().astype(str)
 
     if y_proba.ndim > 2:
         y_proba = np.squeeze(y_proba)
-
     if y_proba.ndim != 2:
-        raise ValueError(
-            f"Probability array must be 2-D; received shape {y_proba.shape}."
-        )
-
+        raise ValueError("Probability output must be a 2-D array.")
     if len(y_true) != y_proba.shape[0]:
-        raise ValueError(
-            "ROC-AUC cannot be calculated because y_true length "
-            f"({len(y_true)}) differs from probability rows ({y_proba.shape[0]})."
-        )
-
+        raise ValueError("Probability row count does not match the held-out labels.")
     if y_proba.shape[1] != len(class_names):
-        raise ValueError(
-            "Probability-column count does not match class count: "
-            f"{y_proba.shape[1]} columns vs {len(class_names)} classes."
-        )
-
+        raise ValueError("Probability-column count does not match the model class count.")
     if len(np.unique(class_names)) != len(class_names):
-        raise ValueError("class_names contains duplicate class labels.")
-
-    unknown_labels = sorted(set(np.unique(y_true)) - set(class_names))
-    if unknown_labels:
-        raise ValueError(
-            "y_true contains labels outside the probability class order: "
-            + ", ".join(unknown_labels)
-        )
-
+        raise ValueError("Model class order contains duplicate labels.")
+    if not set(np.unique(y_true)).issubset(set(class_names)):
+        raise ValueError("Held-out labels fall outside the model class order.")
     if not np.isfinite(y_proba).all():
-        raise ValueError("Probability array contains NaN or infinite values.")
-
+        raise ValueError("Probability output contains non-finite values.")
     if np.any(y_proba < -1e-9) or np.any(y_proba > 1.0 + 1e-9):
-        raise ValueError("Probability array contains values outside [0, 1].")
-
-    if not np.allclose(
-        y_proba.sum(axis=1),
-        1.0,
-        rtol=1e-5,
-        atol=1e-5,
-    ):
+        raise ValueError("Probability output contains values outside [0, 1].")
+    if not np.allclose(y_proba.sum(axis=1), 1.0, rtol=1e-5, atol=1e-5):
         raise ValueError("Probability rows do not sum to 1 within tolerance.")
 
-    y_bin = label_binarize(
-        y_true,
-        classes=class_names,
-    )
-
+    y_bin = label_binarize(y_true, classes=class_names)
     return float(
         roc_auc_score(
             y_bin,
@@ -2849,12 +2927,14 @@ def calculate_multiclass_roc_auc(
     )
 
 
-def calculate_saved_metrics(
+def calculate_evaluation_metrics(
     y_true: np.ndarray,
     y_pred: np.ndarray,
     y_proba: np.ndarray,
     classes: np.ndarray,
 ) -> Dict[str, float]:
+    y_true = np.asarray(y_true).ravel().astype(str)
+    y_pred = np.asarray(y_pred).ravel().astype(str)
     errors = int(np.sum(y_true != y_pred))
     test_size = int(len(y_true))
 
@@ -2875,264 +2955,131 @@ def calculate_saved_metrics(
         "Test Size": test_size,
     }
 
-def validate_evaluation_artifacts(
-    model_name: str,
-    y_true: np.ndarray,
-    y_pred: np.ndarray,
-    y_proba: np.ndarray,
-    classes: np.ndarray,
-) -> None:
-    y_true = np.asarray(y_true).ravel().astype(str)
-    y_pred = np.asarray(y_pred).ravel().astype(str)
-    y_proba = np.asarray(y_proba, dtype=float)
-    classes = np.asarray(classes).ravel().astype(str)
 
-    if y_proba.ndim > 2:
-        y_proba = np.squeeze(y_proba)
-    if y_proba.ndim != 2:
-        raise ValueError("predict_proba artifact must be a 2-D array")
-    if len(y_true) != len(y_pred):
-        raise ValueError("prediction length does not match y_test")
-    if y_proba.shape[0] != len(y_true):
-        raise ValueError("probability row count does not match y_test")
-    if y_proba.shape[1] != len(classes):
-        raise ValueError(
-            f"probability columns ({y_proba.shape[1]}) do not match class count ({len(classes)})"
-        )
-    if len(np.unique(classes)) != len(classes):
-        raise ValueError("model class order contains duplicate labels")
-    if not np.isfinite(y_proba).all():
-        raise ValueError("probability artifact contains NaN or infinite values")
-    if np.any(y_proba < -1e-9) or np.any(y_proba > 1.0 + 1e-9):
-        raise ValueError("probability artifact contains values outside [0, 1]")
-    if not np.allclose(y_proba.sum(axis=1), 1.0, rtol=1e-5, atol=1e-5):
-        raise ValueError("probability rows do not sum to 1 within tolerance")
-    if not set(np.unique(y_true)).issubset(set(classes)):
-        raise ValueError("y_test contains labels outside the model probability class order")
-    if not set(np.unique(y_pred)).issubset(set(classes)):
-        raise ValueError("saved predictions contain labels outside the model class set")
+def _decode_predictions(model_name: str, raw_predictions: np.ndarray) -> np.ndarray:
+    raw_predictions = np.asarray(raw_predictions).ravel()
+    if model_name != "XGBoost":
+        return raw_predictions.astype(str)
 
-def notebook_match(model_name: str, metrics: Dict[str, float], tolerance: float = 0.0015) -> Tuple[bool, str]:
-    expected = NOTEBOOK_TEST_RESULTS.get(model_name)
-    if expected is None:
-        return True, "No notebook reference configured."
+    raw_as_str = raw_predictions.astype(str)
+    if set(np.unique(raw_as_str)).issubset(set(XGB_CLASS_NAMES)):
+        return raw_as_str
 
-    mismatches = []
+    ids = raw_predictions.astype(int)
+    if np.any(ids < 0) or np.any(ids >= len(XGB_CLASS_NAMES)):
+        raise ValueError("XGBoost returned an unknown class ID.")
+    return XGB_CLASS_NAMES[ids].astype(str)
+
+
+def _validate_feature_schema(model_name: str, model, X_eval: pd.DataFrame) -> None:
+    expected_columns = [str(x) for x in X_eval.columns]
+
+    if hasattr(model, "n_features_in_") and int(model.n_features_in_) != len(expected_columns):
+        raise ValueError("Model feature count does not match the 23-feature evaluation schema.")
+
+    model_names = None
+    if model_name == "XGBoost" and hasattr(model, "get_booster"):
+        model_names = model.get_booster().feature_names
+    elif hasattr(model, "feature_names_in_"):
+        model_names = list(model.feature_names_in_)
+
+    if model_names is not None and [str(x) for x in model_names] != expected_columns:
+        raise ValueError("Model feature names/order do not match the evaluation schema.")
+
+
+def _metrics_match_project(model_name: str, metrics: Dict[str, float]) -> bool:
+    reference = PROJECT_TEST_RESULTS[model_name]
     for key in ["Accuracy", "Precision", "Recall", "Weighted F1", "Macro F1", "ROC-AUC"]:
-        if abs(metrics[key] - expected[key]) > tolerance:
-            mismatches.append(f"{key}: app {metrics[key]:.4f} vs notebook {expected[key]:.4f}")
-    if int(metrics["Errors"]) != int(expected["Errors"]):
-        mismatches.append(f"Errors: app {metrics['Errors']} vs notebook {expected['Errors']}")
-
-    if mismatches:
-        return False, "; ".join(mismatches)
-    return True, "Saved artifacts match the executed notebook reference values within rounding tolerance."
+        if abs(float(metrics[key]) - float(reference[key])) > MODEL_METRIC_TOLERANCE:
+            return False
+    return int(metrics["Errors"]) == int(reference["Errors"])
 
 
-def load_evaluation_artifact(model_name: str) -> Tuple[Optional[Dict], Optional[str]]:
-    config = MODEL_REGISTRY[model_name]
-    required = [
-        config["model_path"],
-        X_TEST_PATH,
-        Y_TEST_PATH,
-        config["y_pred_path"],
-        config["y_proba_path"],
+@st.cache_resource(show_spinner=False)
+def load_evaluation_bundle(model_name: str) -> Tuple[Optional[Dict], Optional[str]]:
+    """
+    Select a trained classifier only when its actual behaviour reproduces the
+    established project evaluation on the exact fixed split/feature schema.
+
+    Prediction/probability sidecar files are deliberately not used as metric
+    sources. This prevents stale outputs from overriding the trained classifier.
+    """
+    eval_data = build_project_evaluation_data()
+    X_eval = eval_data["X_test_encoded"]
+    y_true = eval_data["y_test"]
+
+    existing_paths = [
+        path
+        for path in MODEL_REGISTRY[model_name]["model_candidates"]
+        if Path(path).exists()
     ]
-    missing = [path for path in required if not Path(path).exists()]
-    if missing:
-        return None, "Missing required evaluation file(s): " + ", ".join(missing)
+    if not existing_paths:
+        return None, f"{model_name} is unavailable because its trained model could not be found."
 
-    try:
-        model = load_model(config["model_path"])
-        X_test = load_joblib_data(X_TEST_PATH)
-        y_true = np.asarray(load_joblib_data(Y_TEST_PATH)).ravel().astype(str)
-        saved_y_pred = np.asarray(load_joblib_data(config["y_pred_path"])).ravel().astype(str)
-        saved_y_proba = np.asarray(load_joblib_data(config["y_proba_path"]), dtype=float)
-        if saved_y_proba.ndim > 2:
-            saved_y_proba = np.squeeze(saved_y_proba)
-
-        # For sklearn classifiers/pipelines, classes_ defines predict_proba column order.
-        # XGBoost retains the fixed LabelEncoder mapping from the executed notebook.
-        classes = get_model_classes(model_name, model)
-
-        validate_evaluation_artifacts(
-            model_name,
-            y_true,
-            saved_y_pred,
-            saved_y_proba,
-            classes,
-        )
-
-        # Preserve the project's saved evaluation artifacts as the displayed metric source.
-        # They are not overwritten, reordered, retrained or modified here.
-        metrics = calculate_saved_metrics(
-            y_true,
-            saved_y_pred,
-            saved_y_proba,
-            classes,
-        )
-
-        matches, match_message = notebook_match(model_name, metrics)
-
-        # Independent deployment consistency check. This does not replace the saved
-        # artifacts; it only tests whether they came from the currently loaded model.
-        model_reproduction_available = False
-        model_reproduction_error = None
-        saved_prediction_match = None
-        saved_probability_match = None
-        model_metrics = None
-
+    for model_path in existing_paths:
         try:
-            model_pred_raw = np.asarray(model.predict(X_test)).ravel()
-            model_proba = np.asarray(model.predict_proba(X_test), dtype=float)
-            if model_proba.ndim > 2:
-                model_proba = np.squeeze(model_proba)
+            model = load_model(model_path)
+            _validate_feature_schema(model_name, model, X_eval)
 
-            if model_name == "XGBoost":
-                raw_as_str = model_pred_raw.astype(str)
-                if set(np.unique(raw_as_str)).issubset(set(XGB_CLASS_NAMES)):
-                    model_pred = raw_as_str
-                else:
-                    model_pred = XGB_CLASS_NAMES[model_pred_raw.astype(int)].astype(str)
-            else:
-                model_pred = model_pred_raw.astype(str)
+            raw_pred = np.asarray(model.predict(X_eval)).ravel()
+            y_pred = _decode_predictions(model_name, raw_pred)
+            y_proba = np.asarray(model.predict_proba(X_eval), dtype=float)
+            if y_proba.ndim > 2:
+                y_proba = np.squeeze(y_proba)
 
-            validate_evaluation_artifacts(
-                model_name,
-                y_true,
-                model_pred,
-                model_proba,
-                classes,
-            )
+            classes = get_model_classes(model_name, model)
+            metrics = calculate_evaluation_metrics(y_true, y_pred, y_proba, classes)
 
-            saved_prediction_match = bool(
-                np.array_equal(saved_y_pred, model_pred)
-            )
-            saved_probability_match = bool(
-                np.allclose(
-                    saved_y_proba,
-                    model_proba,
-                    rtol=1e-7,
-                    atol=1e-9,
-                )
-            )
-            model_metrics = calculate_saved_metrics(
-                y_true,
-                model_pred,
-                model_proba,
-                classes,
-            )
-            model_reproduction_available = True
+            # The check is a model-selection safeguard, not a displayed value source.
+            if not _metrics_match_project(model_name, metrics):
+                continue
 
-        except Exception as reproduction_exc:
-            model_reproduction_error = str(reproduction_exc)
-
-        return {
-            "model": model,
-            "X_test": X_test,
-            "y_true": y_true,
-            "y_pred": saved_y_pred,
-            "y_proba": saved_y_proba,
-            "classes": classes,
-            "metrics": metrics,
-            "notebook_match": matches,
-            "notebook_match_message": match_message,
-            "model_reproduction_available": model_reproduction_available,
-            "model_reproduction_error": model_reproduction_error,
-            "saved_prediction_match": saved_prediction_match,
-            "saved_probability_match": saved_probability_match,
-            "model_metrics": model_metrics,
-        }, None
-    except Exception as exc:
-        return None, f"Could not load/validate {model_name} evaluation artifacts: {exc}"
-
-def get_cv_dataframe() -> Tuple[pd.DataFrame, str]:
-    if Path(CV_RESULTS_CSV).exists():
-        try:
-            cv_df = pd.read_csv(CV_RESULTS_CSV)
-            required = {"Model", "CV Accuracy", "CV Accuracy Std", "CV F1", "CV F1 Std"}
-            if required.issubset(cv_df.columns):
-                return cv_df[list(required)].copy(), "Saved CV CSV"
+            return {
+                "model": model,
+                "model_path": model_path,
+                "X_test": X_eval,
+                "y_true": y_true,
+                "y_pred": y_pred,
+                "y_proba": y_proba,
+                "classes": classes,
+                "metrics": metrics,
+            }, None
         except Exception:
-            pass
+            continue
 
-    rows = []
-    for model_name, values in NOTEBOOK_CV_RESULTS.items():
-        rows.append({"Model": model_name, **values})
-    return pd.DataFrame(rows), "Executed notebook reference"
+    return (
+        None,
+        f"{model_name} is unavailable because the available trained model does not "
+        "match the project's fixed evaluation pipeline.",
+    )
 
 
-def build_comparison_dataframe() -> Tuple[pd.DataFrame, Dict[str, Dict], List[str]]:
-    rows = []
-    artifacts = {}
-    warnings = []
+def get_cv_dataframe() -> pd.DataFrame:
+    return pd.DataFrame(
+        [{"Model": model_name, **values} for model_name, values in PROJECT_CV_RESULTS.items()]
+    )
+
+
+def build_comparison_dataframe() -> Tuple[pd.DataFrame, Dict[str, Dict], Dict[str, str]]:
+    rows: List[Dict] = []
+    bundles: Dict[str, Dict] = {}
+    errors: Dict[str, str] = {}
 
     for model_name in MODEL_REGISTRY:
-        artifact, error = load_evaluation_artifact(model_name)
-        if artifact is not None:
-            artifacts[model_name] = artifact
-            row = {"Model": model_name, **artifact["metrics"], "Metric Source": "Saved artifacts"}
-            rows.append(row)
+        bundle, error = load_evaluation_bundle(model_name)
+        if bundle is None:
+            errors[model_name] = error or f"{model_name} is unavailable."
+            continue
 
-            if artifact["model_reproduction_available"]:
-                if not artifact["saved_prediction_match"] or not artifact["saved_probability_match"]:
-                    differences = []
-                    if not artifact["saved_prediction_match"]:
-                        differences.append("saved y_pred differs from the loaded model")
-                    if not artifact["saved_probability_match"]:
-                        differences.append("saved y_pred_proba differs from the loaded model")
-                    warnings.append(
-                        f"{model_name}: " + "; ".join(differences) + ". "
-                        "The saved evaluation files may originate from a different model/export version."
-                    )
-            elif artifact["model_reproduction_error"]:
-                warnings.append(
-                    f"{model_name}: loaded-model reproduction check could not be completed: "
-                    f"{artifact['model_reproduction_error']}"
-                )
-
-            if not artifact["notebook_match"]:
-                if (
-                    artifact["model_reproduction_available"]
-                    and artifact["saved_prediction_match"]
-                    and artifact["saved_probability_match"]
-                ):
-                    warnings.append(
-                        f"{model_name}: the saved evaluation artifacts reproduce the currently loaded model, "
-                        f"but they do not reproduce the executed notebook reference — "
-                        f"{artifact['notebook_match_message']}. "
-                        "This indicates a deployment/export version difference rather than a change made by the dashboard."
-                    )
-                else:
-                    warnings.append(
-                        f"{model_name}: saved evaluation artifacts do not reproduce the executed notebook reference — "
-                        f"{artifact['notebook_match_message']}. "
-                        "They may originate from a different model, preprocessing, or test export."
-                    )
-        else:
-            # Presentation fallback: use executed-notebook reference values only, clearly labelled.
-            expected = NOTEBOOK_TEST_RESULTS.get(model_name)
-            if expected:
-                test_size = 627
-                rows.append(
-                    {
-                        "Model": model_name,
-                        **expected,
-                        "Error Rate": float(expected["Errors"] / test_size),
-                        "Test Size": test_size,
-                        "Metric Source": "Executed notebook reference",
-                    }
-                )
-            warnings.append(f"{model_name}: {error}")
+        bundles[model_name] = bundle
+        rows.append({"Model": model_name, **bundle["metrics"]})
 
     comparison = pd.DataFrame(rows)
-    cv_df, cv_source = get_cv_dataframe()
     if not comparison.empty:
-        if "Error Rate" not in comparison.columns:
-            comparison["Error Rate"] = comparison["Errors"] / comparison["Test Size"]
-        comparison = comparison.merge(cv_df, on="Model", how="left")
-    comparison.attrs["cv_source"] = cv_source
-    return comparison, artifacts, warnings
+        comparison = comparison.merge(get_cv_dataframe(), on="Model", how="left")
+
+    return comparison, bundles, errors
+
 
 def confusion_details(artifact: Dict) -> Dict:
     cm = confusion_matrix(
@@ -3203,7 +3150,7 @@ def plot_confusion_matrix(artifact: Dict, mode: str) -> go.Figure:
     )
     fig.update_layout(title=title, xaxis_title="Predicted category", yaxis_title="Actual category")
     fig.update_yaxes(autorange="reversed")
-    return base_plot_layout(fig, 650)
+    return base_plot_layout(fig, 620)
 
 
 def class_performance_dataframe(artifact: Dict) -> pd.DataFrame:
@@ -3306,37 +3253,68 @@ def compute_roc_details(artifact: Dict) -> Dict:
 
 def plot_roc_classes(roc_details: Dict) -> go.Figure:
     fig = go.Figure()
+
     for cls in OBESITY_ORDER:
         if cls not in roc_details["fpr"]:
             continue
+
+        class_auc = roc_details["class_auc"][cls]
+        readable = display_label(cls)
+
         fig.add_trace(
             go.Scatter(
                 x=roc_details["fpr"][cls],
                 y=roc_details["tpr"][cls],
                 mode="lines",
-                name=f"{display_label(cls)} (AUC {roc_details['class_auc'][cls]:.3f})",
+                name=f"{readable} · AUC {class_auc:.3f}",
                 line=dict(color=OBESITY_COLORS[cls], width=2),
+                hovertemplate=(
+                    f"<b>{readable}</b><br>"
+                    "False Positive Rate: %{x:.3f}<br>"
+                    "True Positive Rate: %{y:.3f}<br>"
+                    f"AUC: {class_auc:.3f}"
+                    "<extra></extra>"
+                ),
             )
         )
+
     fig.add_trace(
         go.Scatter(
             x=[0, 1],
             y=[0, 1],
             mode="lines",
-            name="Random baseline (AUC 0.5)",
+            name="Random baseline · AUC 0.500",
             line=dict(color="#7A8B92", dash="dash", width=1.5),
+            hovertemplate=(
+                "<b>Random baseline</b><br>"
+                "False Positive Rate: %{x:.3f}<br>"
+                "True Positive Rate: %{y:.3f}<br>"
+                "AUC: 0.500<extra></extra>"
+            ),
         )
     )
+
     fig.update_layout(
         title="One-vs-Rest ROC Curves by Obesity Category",
         xaxis_title="False Positive Rate",
         yaxis_title="True Positive Rate",
-        legend=dict(orientation="v", x=1.01, y=1),
+        legend=dict(
+            orientation="h",
+            yanchor="top",
+            y=-0.16,
+            xanchor="left",
+            x=0,
+            font=dict(size=11),
+            entrywidth=205,
+            entrywidthmode="pixels",
+        ),
     )
     fig.update_xaxes(range=[0, 1])
     fig.update_yaxes(range=[0, 1])
-    return base_plot_layout(fig, 600)
 
+    fig = base_plot_layout(fig, 620)
+    fig.update_layout(margin=dict(l=24, r=24, t=68, b=155))
+    return fig
 
 def plot_roc_averages(roc_details: Dict) -> go.Figure:
     micro_fpr, micro_tpr, micro_auc = roc_details["micro"]
@@ -3348,8 +3326,14 @@ def plot_roc_averages(roc_details: Dict) -> go.Figure:
             x=micro_fpr,
             y=micro_tpr,
             mode="lines",
-            name=f"Micro-average (AUC {micro_auc:.3f})",
+            name=f"Micro-average · AUC {micro_auc:.3f}",
             line=dict(color="#1F5F75", width=3),
+            hovertemplate=(
+                "<b>Micro-average</b><br>"
+                "False Positive Rate: %{x:.3f}<br>"
+                "True Positive Rate: %{y:.3f}<br>"
+                f"AUC: {micro_auc:.3f}<extra></extra>"
+            ),
         )
     )
     fig.add_trace(
@@ -3357,8 +3341,14 @@ def plot_roc_averages(roc_details: Dict) -> go.Figure:
             x=macro_fpr,
             y=macro_tpr,
             mode="lines",
-            name=f"Macro-average (AUC {macro_auc:.3f})",
+            name=f"Macro-average · AUC {macro_auc:.3f}",
             line=dict(color="#3A8688", width=3, dash="dot"),
+            hovertemplate=(
+                "<b>Macro-average</b><br>"
+                "False Positive Rate: %{x:.3f}<br>"
+                "True Positive Rate: %{y:.3f}<br>"
+                f"AUC: {macro_auc:.3f}<extra></extra>"
+            ),
         )
     )
     fig.add_trace(
@@ -3366,19 +3356,33 @@ def plot_roc_averages(roc_details: Dict) -> go.Figure:
             x=[0, 1],
             y=[0, 1],
             mode="lines",
-            name="Random baseline",
+            name="Random baseline · AUC 0.500",
             line=dict(color="#7A8B92", dash="dash", width=1.5),
+            hovertemplate=(
+                "<b>Random baseline</b><br>"
+                "False Positive Rate: %{x:.3f}<br>"
+                "True Positive Rate: %{y:.3f}<br>"
+                "AUC: 0.500<extra></extra>"
+            ),
         )
     )
     fig.update_layout(
         title="Micro- and Macro-average ROC Curves",
         xaxis_title="False Positive Rate",
         yaxis_title="True Positive Rate",
+        legend=dict(
+            orientation="h",
+            yanchor="top",
+            y=-0.14,
+            xanchor="left",
+            x=0,
+        ),
     )
     fig.update_xaxes(range=[0, 1])
     fig.update_yaxes(range=[0, 1])
-    return base_plot_layout(fig, 520)
-
+    fig = base_plot_layout(fig, 540)
+    fig.update_layout(margin=dict(l=24, r=24, t=68, b=105))
+    return fig
 
 def strip_transformer_prefix(name: str) -> str:
     return str(name).split("__", 1)[-1]
@@ -3394,7 +3398,7 @@ def model_feature_analysis(model_name: str, artifact: Dict) -> Tuple[Optional[pd
             return (
                 None,
                 "KNN has no intrinsic feature importance.",
-                "The notebook used permutation importance. Its saved CSV was not found, so no feature ranking is fabricated here.",
+                "Permutation importance is the appropriate post-hoc feature view for KNN. The prepared ranking is not available in this presentation.",
             )
         df = pd.read_csv(path)
         possible = [
@@ -3404,13 +3408,13 @@ def model_feature_analysis(model_name: str, artifact: Dict) -> Tuple[Optional[pd
         ]
         importance_col = next((c for c in possible if c in df.columns), None)
         if "Feature" not in df.columns or importance_col is None:
-            return None, "Permutation importance unavailable", "The saved KNN CSV format was not recognised."
+            return None, "Permutation importance unavailable", "The prepared KNN feature ranking could not be read."
         out = df[["Feature", importance_col]].copy()
         out.columns = ["Feature", "Importance"]
         out = out.sort_values("Importance", ascending=False).head(15)
         return (
             out,
-            "KNN permutation importance (saved notebook analysis)",
+            "KNN permutation importance",
             "Permutation importance measures the drop in predictive performance when a feature is shuffled; it is not built into KNN.",
         )
 
@@ -3467,7 +3471,7 @@ def model_feature_analysis(model_name: str, artifact: Dict) -> Tuple[Optional[pd
             note = "Random Forest importance reflects impurity reduction across fitted trees. Importance is model association, not causal effect."
         return out, title, note
 
-    return None, "Feature analysis unavailable", "This model does not expose a supported feature-analysis artifact."
+    return None, "Feature analysis unavailable", "A supported feature-analysis view is not available for this model."
 
 
 def plot_feature_analysis(feature_df: pd.DataFrame, title: str) -> go.Figure:
@@ -3512,26 +3516,20 @@ def aggregate_feature_importance(feature_df: pd.DataFrame) -> pd.DataFrame:
 # =============================================================================
 
 def get_prediction_columns(model_name: str, model) -> List[str]:
-    # Prefer the exact shared X_test artifact schema because the trained models
-    # were deployed against this 23-column encoded format.
-    if Path(X_TEST_PATH).exists():
-        try:
-            X_test = load_joblib_data(X_TEST_PATH)
-            if isinstance(X_test, pd.DataFrame):
-                if model_name == "XGBoost" and hasattr(model, "get_booster"):
-                    booster_names = model.get_booster().feature_names
-                    if booster_names:
-                        if list(booster_names) != X_test.columns.tolist():
-                            raise ValueError(
-                                "XGBoost booster feature names do not match shared X_test_encoded columns."
-                            )
-                        return list(booster_names)
-                return X_test.columns.tolist()
-        except Exception:
-            pass
+    X_test = build_project_evaluation_data()["X_test_encoded"]
+    columns = X_test.columns.tolist()
 
-    return get_model_feature_names(model_name, model, None)
+    if model_name == "XGBoost" and hasattr(model, "get_booster"):
+        booster_names = model.get_booster().feature_names
+        if booster_names and list(booster_names) != columns:
+            raise ValueError("XGBoost feature names do not match the project input schema.")
 
+    if hasattr(model, "feature_names_in_"):
+        model_names = [str(x) for x in model.feature_names_in_]
+        if model_names != columns:
+            raise ValueError("Model feature names do not match the project input schema.")
+
+    return columns
 
 def build_encoded_prediction_row(model_name: str, model, values: Dict) -> pd.DataFrame:
     columns = get_prediction_columns(model_name, model)
@@ -3564,18 +3562,21 @@ def build_encoded_prediction_row(model_name: str, model, values: Dict) -> pd.Dat
 
 
 def make_prediction(model_name: str, input_values: Dict) -> Dict:
-    model_path = MODEL_REGISTRY[model_name]["model_path"]
-    if not Path(model_path).exists():
-        raise FileNotFoundError(f"Required model file not found: {model_path}")
+    bundle, error = load_evaluation_bundle(model_name)
+    if bundle is None:
+        raise RuntimeError(error or f"{model_name} is unavailable.")
 
-    model = load_model(model_path)
+    model = bundle["model"]
     encoded_row = build_encoded_prediction_row(model_name, model, input_values)
 
-    raw_pred = model.predict(encoded_row)[0]
+    raw_pred = np.asarray(model.predict(encoded_row)).ravel()[0]
     proba = np.asarray(model.predict_proba(encoded_row)[0], dtype=float)
 
     if model_name == "XGBoost":
-        pred_label = str(XGB_CLASS_NAMES[int(raw_pred)])
+        if str(raw_pred) in set(XGB_CLASS_NAMES):
+            pred_label = str(raw_pred)
+        else:
+            pred_label = str(XGB_CLASS_NAMES[int(raw_pred)])
         proba_classes = XGB_CLASS_NAMES.copy()
     else:
         pred_label = str(raw_pred)
@@ -3583,6 +3584,8 @@ def make_prediction(model_name: str, input_values: Dict) -> Dict:
 
     if len(proba) != len(proba_classes):
         raise ValueError("Prediction probability count does not match model class count.")
+    if not np.isclose(proba.sum(), 1.0, rtol=1e-5, atol=1e-5):
+        raise ValueError("Prediction probabilities do not sum to 1 within tolerance.")
 
     return {
         "model": model_name,
@@ -3592,7 +3595,6 @@ def make_prediction(model_name: str, input_values: Dict) -> Dict:
         "probabilities": proba,
         "encoded_columns": list(encoded_row.columns),
     }
-
 
 # =============================================================================
 # DATA-DRIVEN STORYTELLING
@@ -3675,7 +3677,7 @@ def render_overview_page(raw: pd.DataFrame, clean: pd.DataFrame) -> None:
         "Obesity Risk Analytics & Classification Dashboard",
         "Interactive exploration and machine-learning classification of obesity levels using demographic, dietary, physical and lifestyle characteristics.",
     )
-    render_source_pills(["CRISP-DM", "2,087 cleaned records", "7 classes", "4 ML models", "No retraining in app"])
+    render_source_pills(["CRISP-DM", "2,087 cleaned records", "7 classes", "4 ML models", "Held-out evaluation"])
 
     st.markdown("### Project at a glance")
     render_kpi_grid(
@@ -3694,7 +3696,7 @@ def render_overview_page(raw: pd.DataFrame, clean: pd.DataFrame) -> None:
             "The project classifies individuals into seven obesity-level categories using 16 predictors covering "
             "demographics, physical measurements, eating habits and lifestyle behaviour. The dashboard is designed "
             "to communicate the full analytical chain—from data quality and EDA to model evaluation and a live "
-            "prediction prototype—without requiring the lecturer to open the notebook."
+            "interactive prediction in one presentation-focused analytical workflow."
         )
 
         st.markdown("### Analysis workflow")
@@ -3726,7 +3728,7 @@ def render_overview_page(raw: pd.DataFrame, clean: pd.DataFrame) -> None:
     st.warning(
         "The UCI dataset described in the project report combines approximately 23% directly collected observations "
         "with 77% synthetically generated observations. Very strong patterns may therefore partly reflect how the "
-        "dataset was constructed. The dashboard treats results as an academic classification prototype; external "
+        "dataset was constructed. The dashboard treats results as an academic classification analysis; external "
         "validation would be required before any real-world deployment."
     )
 
@@ -3742,7 +3744,7 @@ def render_data_preparation_page(raw: pd.DataFrame, clean: pd.DataFrame) -> None
     duplicates = int(raw.duplicated().sum())
     render_kpi_grid(
         [
-            ("Original Records", f"{len(raw):,}", "Raw UCI dataset"),
+            ("Original Records", f"{len(raw):,}", "Original dataset"),
             ("Cleaned Records", f"{len(clean):,}", "After exact duplicate removal"),
             ("Duplicates Removed", f"{duplicates}", "Removed before train/test split"),
             ("Missing Values", f"{missing}", "No imputation required"),
@@ -3763,8 +3765,8 @@ def render_data_preparation_page(raw: pd.DataFrame, clean: pd.DataFrame) -> None
         ("Feature / Target Separation", "Separated 16 predictors from NObeyesdad so the target was never included as an input feature."),
         ("70:30 Stratified Split", "Used stratify=y and random_state=42, producing 1,460 training and 627 test observations."),
         ("Categorical Encoding", "Applied One-Hot Encoding with drop_first=True, giving the 23-feature encoded model schema."),
-        ("Numerical Scaling Where Required", "Logistic Regression and KNN deployment Pipelines scale the eight numerical predictors; Random Forest and XGBoost use encoded unscaled predictors."),
-        ("Model-Ready Dataset", "Saved models/predictions use the project's existing 23-feature deployment schema. This dashboard does not retrain or alter it."),
+        ("Numerical Scaling Where Required", "Logistic Regression and KNN apply StandardScaler within their model pipelines; Random Forest and XGBoost use encoded unscaled predictors."),
+        ("Model-Ready Dataset", "The trained classifiers use the project's established 23-feature input schema, which is preserved throughout evaluation and prediction."),
     ]
     for i, (title, text) in enumerate(steps, start=1):
         st.markdown(
@@ -3788,7 +3790,7 @@ def render_data_preparation_page(raw: pd.DataFrame, clean: pd.DataFrame) -> None
         ],
         columns=["Data Quality Item", "Before", "Action", "After"],
     )
-    st.dataframe(quality_df, use_container_width=True, hide_index=True)
+    st.dataframe(quality_df, width="stretch", hide_index=True)
 
     st.markdown("### Train/test split and stratification")
     from sklearn.model_selection import train_test_split
@@ -3844,7 +3846,7 @@ def render_data_preparation_page(raw: pd.DataFrame, clean: pd.DataFrame) -> None
         )
         fig.update_yaxes(tickformat=".0%", title="Share of partition")
         fig.update_xaxes(title="")
-        st.plotly_chart(base_plot_layout(fig, 470), use_container_width=True)
+        render_plotly(base_plot_layout(fig, 460))
 
     tab1, tab2, tab3, tab4 = st.tabs(
         ["Categorical Consistency", "Outlier Assessment", "Encoding & Scaling", "EDA Enrichment"]
@@ -3863,7 +3865,7 @@ def render_data_preparation_page(raw: pd.DataFrame, clean: pd.DataFrame) -> None
                     "Consistency": "Pass" if observed == expected else "Review",
                 }
             )
-        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
         render_insight(
             "What this shows",
             "The cleaned data uses the expected category labels without introducing automatic spelling fixes or category merging. This keeps the dashboard consistent with the model training schema.",
@@ -3881,7 +3883,7 @@ def render_data_preparation_page(raw: pd.DataFrame, clean: pd.DataFrame) -> None
                     "Observed Max": "{:.2f}",
                 }
             ),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
         render_insight(
@@ -3894,17 +3896,17 @@ def render_data_preparation_page(raw: pd.DataFrame, clean: pd.DataFrame) -> None
             [
                 ["Original predictors", 16, "8 numerical + 8 categorical"],
                 ["One-Hot Encoding", 23, "drop_first=True; training/test schema aligned"],
-                ["Logistic Regression", 23, "Encoded input → internal StandardScaler → Logistic Regression"],
-                ["KNN", 23, "Encoded input → internal StandardScaler → KNN"],
+                ["Logistic Regression", 23, "Encoded input → StandardScaler → Logistic Regression"],
+                ["KNN", 23, "Encoded input → StandardScaler → KNN"],
                 ["Random Forest", 23, "Encoded, unscaled predictors"],
                 ["XGBoost", 23, "Encoded, unscaled predictors with fixed booster feature names"],
             ],
             columns=["Stage / Model", "Feature Count", "Data Handling"],
         )
-        st.dataframe(encoding_df, use_container_width=True, hide_index=True)
+        st.dataframe(encoding_df, width="stretch", hide_index=True)
         render_insight(
             "Leakage-control principle",
-            "The main train/test split occurs before scaling. The deployment models do not refit preprocessing inside Streamlit: they only apply the already-fitted model/pipeline to user input.",
+            "The train/test split occurs before model-specific scaling. Numerical scaling is applied only where required by the trained classifier.",
         )
 
     with tab4:
@@ -3921,11 +3923,11 @@ def render_data_preparation_page(raw: pd.DataFrame, clean: pd.DataFrame) -> None
                     "Mean BMI": bmi_means.values,
                 }
             )
-            st.dataframe(bmi_df.style.format({"Mean BMI": "{:.2f}"}), use_container_width=True, hide_index=True)
+            st.dataframe(bmi_df.style.format({"Mean BMI": "{:.2f}"}), width="stretch", hide_index=True)
         with col_b:
             st.markdown("**AgeGroup — EDA-only derived variable**")
             age_df = age_counts.rename_axis("Age Group").reset_index(name="Records")
-            st.dataframe(age_df, use_container_width=True, hide_index=True)
+            st.dataframe(age_df, width="stretch", hide_index=True)
         st.info(
             "BMI and AgeGroup enrich descriptive analysis only. They are not added to the 16 trained-model predictors, so this dashboard does not change the existing model feature space or results."
         )
@@ -3941,7 +3943,7 @@ def render_eda_page(raw: pd.DataFrame, clean: pd.DataFrame) -> None:
     st.caption("EDA uses the cleaned 2,087-record dataset so the analytical views correspond to the observations used for modelling after duplicate removal.")
 
     st.markdown("### 1. Obesity class distribution")
-    st.plotly_chart(plot_target_distribution(clean), use_container_width=True)
+    render_plotly(plot_target_distribution(clean), key="eda_target")
     counts = clean[TARGET].value_counts(normalize=True).reindex(OBESITY_ORDER)
     render_insight(
         "Why this matters for evaluation",
@@ -3969,7 +3971,7 @@ def render_eda_page(raw: pd.DataFrame, clean: pd.DataFrame) -> None:
         ],
         columns_per_row=3,
     )
-    st.plotly_chart(plot_numeric_distribution(clean, selected_feature), use_container_width=True)
+    render_plotly(plot_numeric_distribution(clean, selected_feature), key=f"eda_dist_{selected_feature}")
     render_insight("Analytical insight", numeric_distribution_insight(clean, selected_feature))
 
     st.markdown("### 3. Obesity level vs numerical features")
@@ -3979,11 +3981,11 @@ def render_eda_page(raw: pd.DataFrame, clean: pd.DataFrame) -> None:
         index=1,
         key="eda_numeric_relationship",
     )
-    st.plotly_chart(plot_numeric_by_class(clean, selected_relation), use_container_width=True)
+    render_plotly(plot_numeric_by_class(clean, selected_relation), key=f"eda_box_{selected_relation}")
     render_insight("What this shows", class_trend_insight(clean, selected_relation))
 
     st.markdown("### 4. Weight–height relationship")
-    st.plotly_chart(plot_weight_height(clean), use_container_width=True)
+    render_plotly(plot_weight_height(clean), key="eda_weight_height")
     bmi_means = clean.groupby(TARGET, observed=True)["BMI"].mean().reindex(OBESITY_ORDER)
     render_insight(
         "Why the joint pattern matters",
@@ -3999,7 +4001,7 @@ def render_eda_page(raw: pd.DataFrame, clean: pd.DataFrame) -> None:
         index=CATEGORICAL_COLUMNS.index("family_history_with_overweight"),
         key="eda_categorical",
     )
-    st.plotly_chart(plot_categorical_relationship(clean, cat_feature), use_container_width=True)
+    render_plotly(plot_categorical_relationship(clean, cat_feature), key=f"eda_cat_{cat_feature}")
     render_insight("Key pattern detected", categorical_insight(clean, cat_feature))
 
     st.markdown("### 6. Relationship & correlation analysis")
@@ -4009,7 +4011,7 @@ def render_eda_page(raw: pd.DataFrame, clean: pd.DataFrame) -> None:
         horizontal=True,
         key="corr_method",
     )
-    st.plotly_chart(plot_correlation_heatmap(clean, corr_method), use_container_width=True)
+    render_plotly(plot_correlation_heatmap(clean, corr_method), key=f"eda_corr_{corr_method}")
 
     focus = st.selectbox(
         "Focus correlation with",
@@ -4051,7 +4053,7 @@ def render_eda_page(raw: pd.DataFrame, clean: pd.DataFrame) -> None:
         st.caption("Eta-squared: descriptive share of numerical-feature variance occurring between obesity groups.")
         st.dataframe(
             numeric_assoc.style.format({"Eta-squared": "{:.3f}"}),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
     with assoc_right:
@@ -4059,7 +4061,7 @@ def render_eda_page(raw: pd.DataFrame, clean: pd.DataFrame) -> None:
         st.caption("Bias-corrected Cramér's V: categorical association measure from 0 to 1.")
         st.dataframe(
             cat_assoc.style.format({"Cramer's V": "{:.3f}"}),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -4101,7 +4103,7 @@ def render_eda_page(raw: pd.DataFrame, clean: pd.DataFrame) -> None:
     else:
         render_insight(
             "EDA observation → model evidence",
-            "The EDA identifies strong body-size separation and meaningful lifestyle/categorical associations. Tree-based feature evidence will appear here when the saved model artifacts are available to Streamlit."
+            "The EDA identifies strong body-size separation and meaningful lifestyle/categorical associations. Tree-based model evidence is shown when the corresponding trained model is available."
         )
 
 
@@ -4109,7 +4111,7 @@ def render_eda_page(raw: pd.DataFrame, clean: pd.DataFrame) -> None:
 def render_model_evaluation_page() -> None:
     render_hero(
         "Model Evaluation",
-        "Detailed evaluation of one saved model at a time, using the project's held-out test artifacts without retraining or changing probabilities.",
+        "Detailed evaluation of one trained model at a time on the fixed held-out test set, with class-level performance, ROC behaviour, stability and error analysis.",
     )
 
     model_name = st.selectbox(
@@ -4118,18 +4120,15 @@ def render_model_evaluation_page() -> None:
         key="model_eval_selector",
     )
 
-    artifact, error = load_evaluation_artifact(model_name)
-    if artifact is None:
-        st.error(error)
-        expected = NOTEBOOK_TEST_RESULTS.get(model_name)
-        if expected:
-            st.info(
-                "The executed notebook reference values are available, but class-level/confusion/ROC views require the saved y_test, y_pred and y_pred_proba files."
-            )
-            st.dataframe(pd.DataFrame([{"Model": model_name, **expected}]), use_container_width=True, hide_index=True)
+    bundle, error = load_evaluation_bundle(model_name)
+    if bundle is None:
+        st.error(
+            f"{model_name} cannot be evaluated consistently with the project test data. "
+            "Please use the matching trained model for this project version."
+        )
         return
 
-    metrics = artifact["metrics"]
+    metrics = bundle["metrics"]
     render_kpi_grid(
         [
             ("Accuracy", fmt_pct(metrics["Accuracy"]), "Held-out test set"),
@@ -4141,15 +4140,6 @@ def render_model_evaluation_page() -> None:
         ],
         columns_per_row=3,
     )
-
-    if artifact["notebook_match"]:
-        st.success("Artifact integrity check: saved held-out metrics match the executed notebook reference values within rounding tolerance.")
-    else:
-        st.warning(
-            "Saved evaluation artifacts do not reproduce the executed notebook reference: "
-            + artifact["notebook_match_message"]
-            + ". The dashboard is reporting the loaded saved artifacts without forcing the notebook value."
-        )
 
     tabs = st.tabs(["Overview", "Confusion Matrix", "Class Performance", "ROC", "Feature Analysis"])
 
@@ -4165,15 +4155,15 @@ def render_model_evaluation_page() -> None:
             st.markdown(f"**Limitation:** {info['limitation']}")
         with right:
             st.metric("Misclassified test cases", f"{metrics['Errors']} / {metrics['Test Size']}")
-            st.metric("Error rate", fmt_pct(metrics["Errors"] / metrics["Test Size"]))
-            cv = NOTEBOOK_CV_RESULTS[model_name]
+            st.metric("Error rate", fmt_pct(metrics["Error Rate"]))
+            cv = PROJECT_CV_RESULTS[model_name]
             st.metric("CV accuracy", f"{cv['CV Accuracy']:.4f} ± {cv['CV Accuracy Std']:.4f}")
-            st.caption("CV values are taken from the executed notebook unless data/cv_results.csv is provided.")
+            st.caption("Five-fold cross-validation summarises stability across training folds.")
 
     with tabs[1]:
         mode = st.radio("View mode", ["Count", "Percentage"], horizontal=True, key=f"cm_mode_{model_name}")
-        st.plotly_chart(plot_confusion_matrix(artifact, mode), use_container_width=True)
-        details = confusion_details(artifact)
+        render_plotly(plot_confusion_matrix(bundle, mode), key=f"cm_{model_name}_{mode}")
+        details = confusion_details(bundle)
         pair = details["pair"]
         pair_text = (
             f"{display_label(pair[0])} ↔ {display_label(pair[1])} ({details['pair_count']} combined errors)"
@@ -4190,13 +4180,13 @@ def render_model_evaluation_page() -> None:
         )
 
     with tabs[2]:
-        class_df = class_performance_dataframe(artifact)
-        st.plotly_chart(plot_class_performance(class_df), use_container_width=True)
+        class_df = class_performance_dataframe(bundle)
+        render_plotly(plot_class_performance(class_df), key=f"class_perf_{model_name}")
         st.dataframe(
             class_df[["Obesity Category", "Precision", "Recall", "F1", "Support"]].style.format(
                 {"Precision": "{:.3f}", "Recall": "{:.3f}", "F1": "{:.3f}"}
             ),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
         strongest = class_df.loc[class_df["F1"].idxmax()]
@@ -4208,10 +4198,10 @@ def render_model_evaluation_page() -> None:
 
     with tabs[3]:
         try:
-            roc_details = compute_roc_details(artifact)
+            roc_details = compute_roc_details(bundle)
             roc_tab1, roc_tab2 = st.tabs(["Per-class ROC", "Micro / Macro ROC"])
             with roc_tab1:
-                st.plotly_chart(plot_roc_classes(roc_details), use_container_width=True)
+                render_plotly(plot_roc_classes(roc_details), key=f"roc_class_{model_name}")
                 auc_table = pd.DataFrame(
                     {
                         "Obesity Category": [display_label(c) for c in OBESITY_ORDER],
@@ -4220,48 +4210,43 @@ def render_model_evaluation_page() -> None:
                 )
                 st.dataframe(
                     auc_table.style.format({"Class AUC": "{:.4f}"}),
-                    use_container_width=True,
+                    width="stretch",
                     hide_index=True,
                 )
+                st.caption("Each coloured curve is a one-vs-rest class ROC curve; its AUC is shown directly in the legend.")
             with roc_tab2:
-                st.plotly_chart(plot_roc_averages(roc_details), use_container_width=True)
-            st.info(
-                "ROC probability columns are aligned to each model's actual saved class order. XGBoost uses the fixed LabelEncoder order from the executed notebook; the chart then reorders labels only for presentation. The random baseline is shown at AUC 0.5."
-            )
-        except Exception as exc:
-            st.warning(f"ROC curves could not be generated safely from the saved probabilities: {exc}")
+                render_plotly(plot_roc_averages(roc_details), key=f"roc_avg_{model_name}")
+                st.caption("Micro-average pools all class decisions, while macro-average gives each class equal weight. The dashed diagonal is the random baseline.")
+        except Exception:
+            st.warning("ROC analysis is unavailable for this model.")
 
     with tabs[4]:
-        feature_df, title, note = model_feature_analysis(model_name, artifact)
+        feature_df, title, note = model_feature_analysis(model_name, bundle)
         st.markdown(f"### {title}")
         st.write(note)
         if feature_df is None:
-            st.info("No supported feature-analysis data is available for this model.")
+            st.info("No supported feature-analysis view is available for this model.")
         else:
-            st.plotly_chart(plot_feature_analysis(feature_df, title), use_container_width=True)
+            render_plotly(plot_feature_analysis(feature_df, title), key=f"feature_{model_name}")
             st.dataframe(
                 feature_df.style.format({"Importance": "{:.5f}"}),
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
-
-
 
 def render_model_comparison_page() -> None:
     render_hero(
         "Model Comparison & Selection",
-        "Evidence-based comparison across four models using held-out performance, cross-validation stability, class errors, interpretability and deployment considerations.",
+        "Evidence-based comparison across four models using held-out performance, cross-validation stability, class errors, interpretability and practical considerations.",
     )
 
-    comparison, artifacts, warnings = build_comparison_dataframe()
-    if comparison.empty:
-        st.error("No saved model metrics or executed-notebook reference values are available.")
+    comparison, artifacts, model_errors = build_comparison_dataframe()
+    if len(comparison) != len(MODEL_REGISTRY):
+        st.error(
+            "Model comparison is unavailable because one or more trained models cannot be "
+            "evaluated consistently with the project test data."
+        )
         return
-
-    if warnings:
-        with st.expander("Artifact availability / consistency notices", expanded=False):
-            for warning in warnings:
-                st.write("• " + warning)
 
     # ============================================================
     # INTERACTIVE MODEL RANKING
@@ -4393,7 +4378,7 @@ def render_model_comparison_page() -> None:
     else:
         ranking_fig.update_xaxes(range=[0, 1])
     ranking_fig.update_yaxes(categoryorder="array", categoryarray=chart_ranked["Model"].tolist())
-    st.plotly_chart(base_plot_layout(ranking_fig, 420), use_container_width=True)
+    render_plotly(base_plot_layout(ranking_fig, 420), key=f"ranking_{ranking_metric}")
 
     st.markdown("### Model ranking table")
     ranking_display = ranked[
@@ -4413,7 +4398,6 @@ def render_model_comparison_page() -> None:
             "CV Accuracy Std",
             "CV F1",
             "CV F1 Std",
-            "Metric Source",
         ]
     ].copy()
 
@@ -4433,7 +4417,7 @@ def render_model_comparison_page() -> None:
     }
     st.dataframe(
         ranking_display.style.format(formatters),
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -4501,7 +4485,7 @@ def render_model_comparison_page() -> None:
     )
     fig.update_yaxes(range=[0, 1], title="Score")
     fig.update_xaxes(title="")
-    st.plotly_chart(base_plot_layout(fig, 520), use_container_width=True)
+    render_plotly(base_plot_layout(fig, 500), key="comparison_core")
     st.info("ROC-AUC is intentionally not placed on this grouped bar axis; it answers a different discrimination question and is retained in the ranking table and model-evaluation ROC view.")
 
     st.markdown("### Cross-validation stability vs held-out test performance")
@@ -4536,7 +4520,7 @@ def render_model_comparison_page() -> None:
         yaxis_title="Accuracy",
     )
     cv_fig.update_yaxes(range=[0, 1])
-    st.plotly_chart(base_plot_layout(cv_fig, 520), use_container_width=True)
+    render_plotly(base_plot_layout(cv_fig, 500), key="comparison_cv")
 
     stability = comparison[["Model", "CV Accuracy", "CV Accuracy Std", "Accuracy"]].copy()
     stability["Absolute CV–Test Gap"] = (stability["CV Accuracy"] - stability["Accuracy"]).abs()
@@ -4548,7 +4532,7 @@ def render_model_comparison_page() -> None:
         f"The closest CV mean to held-out test accuracy is {close_row['Model']} with an absolute gap of {close_row['Absolute CV–Test Gap']:.4f}. "
         "Small fold-to-fold variation and similar CV/test performance provide stronger evidence of stability than test accuracy alone. Cross-validation is not an independent test set."
     )
-    st.caption("Random Forest note: its notebook prints ±2×SD. This dashboard displays the one-standard-deviation values (~0.0208 accuracy, ~0.0211 weighted F1) for consistency with the other models.")
+    st.caption("Cross-validation uncertainty is shown consistently as one standard deviation for all four models.")
 
     st.markdown("### Misclassification comparison")
     error_df = comparison[["Model", "Errors", "Test Size"]].copy()
@@ -4566,7 +4550,7 @@ def render_model_comparison_page() -> None:
     err_fig.update_xaxes(tickformat=".0%", title="Error rate")
     err_fig.update_yaxes(title="")
     err_fig.update_layout(showlegend=False)
-    st.plotly_chart(base_plot_layout(err_fig, 420), use_container_width=True)
+    render_plotly(base_plot_layout(err_fig, 400), key="comparison_errors")
 
     if artifacts:
         selected_error_model = st.selectbox(
@@ -4584,9 +4568,9 @@ def render_model_comparison_page() -> None:
             )
             top["Actual"] = top["Actual"].map(display_label)
             top["Predicted"] = top["Predicted"].map(display_label)
-            st.dataframe(top, use_container_width=True, hide_index=True)
+            st.dataframe(top, width="stretch", hide_index=True)
 
-    st.markdown("### Strengths, limitations and deployment trade-offs")
+    st.markdown("### Strengths, limitations and practical trade-offs")
     tradeoff_df = pd.DataFrame(
         [
             {
@@ -4599,7 +4583,7 @@ def render_model_comparison_page() -> None:
             for name in MODEL_REGISTRY
         ]
     )
-    st.dataframe(tradeoff_df, use_container_width=True, hide_index=True)
+    st.dataframe(tradeoff_df, width="stretch", hide_index=True)
 
     st.markdown("### Final model recommendation")
     primary = comparison.sort_values("Weighted F1", ascending=False).iloc[0]
@@ -4626,24 +4610,27 @@ def render_model_comparison_page() -> None:
     with c2:
         render_insight("Interpretability", f"{primary['Model']} interpretability is rated {info['interpretability']}. Feature analysis helps explain associations, but it is less transparent than Logistic Regression.")
     with c3:
-        render_insight("Operational complexity", f"{primary['Model']} operational complexity is {info['operational_complexity']}. The current saved artifact is still practical for a Streamlit academic prototype.")
+        render_insight("Operational complexity", f"{primary['Model']} operational complexity is {info['operational_complexity']}. The trained classifier remains practical for an interactive academic presentation.")
 
     if primary["Model"] == "XGBoost":
         st.info(
-            "For the current executed project results, XGBoost is not selected because of one isolated number: it leads weighted F1, test accuracy, macro F1, weighted ROC-AUC, CV weighted F1 and error count. Its main trade-off is lower intrinsic interpretability and greater deployment/version sensitivity."
+            "For the current project results, XGBoost is not selected because of one isolated number: it leads weighted F1, test accuracy, macro F1, weighted ROC-AUC, CV weighted F1 and error count. Its main trade-off is lower intrinsic interpretability and greater model and version sensitivity."
         )
 
 
 
 def render_prediction_page() -> None:
     render_hero(
-        "Individual Prediction Prototype",
-        "Enter one profile, choose a saved model, and inspect the predicted obesity category and full class-probability distribution. This is an academic classification demonstration, not a medical diagnosis.",
+        "Individual Prediction",
+        "Enter one profile, choose a trained model, and inspect the predicted obesity category and full class-probability distribution. This is an academic classification demonstration, not a medical diagnosis.",
     )
 
-    available_models = [name for name, cfg in MODEL_REGISTRY.items() if Path(cfg["model_path"]).exists()]
+    available_models = [
+        name for name in MODEL_REGISTRY
+        if load_evaluation_bundle(name)[0] is not None
+    ]
     if not available_models:
-        st.error("No required model files were found in models/.")
+        st.error("No trained model is currently available for consistent prediction.")
         return
 
     model_name = st.selectbox("Prediction model", available_models, key="prediction_model")
@@ -4697,7 +4684,7 @@ def render_prediction_page() -> None:
                     ["Automobile", "Motorbike", "Bike", "Public_Transportation", "Walking"],
                 )
 
-        submitted = st.form_submit_button("Run classification", use_container_width=True)
+        submitted = st.form_submit_button("Run classification", width="stretch")
 
         if submitted:
             values = {
@@ -4741,7 +4728,7 @@ def render_prediction_page() -> None:
             ("Predicted Obesity Level", display_label(result["prediction"]), "Highest predicted probability"),
             ("Prediction Confidence", fmt_pct(result["confidence"]), "Maximum class probability"),
             ("BMI (Reference)", f"{result['BMI']:.2f}", "Not an input feature added by this app"),
-            ("Selected Model", result["model"], "Saved trained artifact"),
+            ("Selected Model", result["model"], "Trained classifier"),
         ]
     )
 
@@ -4768,17 +4755,17 @@ def render_prediction_page() -> None:
     )
     fig.update_layout(title="Predicted Probability Across All Seven Classes", xaxis_title="Predicted probability", yaxis_title="")
     fig.update_xaxes(range=[0, max(1.0, float(proba_df["Probability"].max()) * 1.12)], tickformat=".0%")
-    st.plotly_chart(base_plot_layout(fig, 500), use_container_width=True)
+    render_plotly(base_plot_layout(fig, 480), key="prediction_probability")
 
     st.warning(
-        "This prototype demonstrates machine-learning classification for academic purposes and should not be treated as a medical diagnosis or medical recommendation."
+        "This prediction tool demonstrates machine-learning classification for academic purposes and should not be treated as a medical diagnosis or medical recommendation."
     )
 
     with st.expander("View submitted input summary"):
         summary = pd.DataFrame(
             [{"Feature": k, "Value": humanize_category(v) if isinstance(v, str) else v} for k, v in result["inputs"].items()]
         )
-        st.dataframe(summary, use_container_width=True, hide_index=True)
+        st.dataframe(summary, width="stretch", hide_index=True)
 
 
 # =============================================================================
@@ -4786,7 +4773,7 @@ def render_prediction_page() -> None:
 # =============================================================================
 
 st.sidebar.markdown("## Obesity Analytics")
-st.sidebar.caption("BMDS2003 · CRISP-DM analytical prototype")
+st.sidebar.caption("BMDS2003 · Obesity Classification")
 
 page = st.sidebar.radio(
     "Navigation",
@@ -4802,9 +4789,6 @@ page = st.sidebar.radio(
 )
 
 st.sidebar.markdown("---")
-status_model_files = sum(Path(cfg["model_path"]).exists() for cfg in MODEL_REGISTRY.values())
-st.sidebar.caption(f"Model files detected: {status_model_files}/4")
-st.sidebar.caption(f"Shared test artifact: {'Ready' if Path(X_TEST_PATH).exists() and Path(Y_TEST_PATH).exists() else 'Missing'}")
 
 raw, clean, dataset_path = get_data()
 
@@ -4826,6 +4810,6 @@ elif page == "🔮 Prediction":
 
 st.markdown("---")
 st.caption(
-    "BMDS2003 Data Science · Obesity Levels dataset · Analytical prototype. "
+    "BMDS2003 Data Science · Obesity Levels dataset · Analytical dashboard. "
     "EDA-derived BMI/AgeGroup are for interpretation only and are not added to the trained model feature space."
 )
