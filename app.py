@@ -2,11 +2,6 @@
 BMDS2003 Data Science — Obesity Risk Analytics & Classification Dashboard
 =========================================================================
 
-Presentation-focused Streamlit application for the established BMDS2003
-obesity classification workflow. The application does not train or retune
-models; evaluation is reproduced from the project dataset, fixed split,
-fixed encoding scheme and compatible trained classifiers.
-
 Run with:
     streamlit run app.py
 """
@@ -174,7 +169,14 @@ MODEL_REGISTRY = {
         "model_candidates": [
             "models/logistic_regression_model.pkl",
             "logistic_regression_model.pkl",
+            "logistic_regression_model(1).pkl",
         ],
+        "evaluation": {
+            "X_test": ["data/X_test_encoded.pkl", "X_test_encoded.pkl"],
+            "y_test": ["data/y_test_flat.pkl", "y_test_flat.pkl"],
+            "y_pred": ["data/lr_y_pred.pkl", "lr_y_pred.pkl"],
+            "y_proba": ["data/lr_y_pred_proba.pkl", "lr_y_pred_proba.pkl"],
+        },
         "feature_data_candidates": [
             "data/lr_feature_importance.csv",
             "lr_feature_importance.csv",
@@ -186,6 +188,12 @@ MODEL_REGISTRY = {
             "knn_model.pkl",
             "knn_model (1).pkl",
         ],
+        "evaluation": {
+            "X_test": ["data/X_test_encoded.pkl", "X_test_encoded.pkl"],
+            "y_test": ["data/y_test_flat.pkl", "y_test_flat.pkl"],
+            "y_pred": ["data/knn_y_pred.pkl", "knn_y_pred.pkl"],
+            "y_proba": ["data/knn_y_pred_proba.pkl", "knn_y_pred_proba.pkl"],
+        },
         "feature_data_candidates": [
             "data/knn_feature_importance.csv",
             "knn_feature_importance.csv",
@@ -197,6 +205,12 @@ MODEL_REGISTRY = {
             "random_forest_model.pkl",
             "random_forest_model (2).pkl",
         ],
+        "evaluation": {
+            "X_test": ["data/X_test_encoded.pkl", "X_test_encoded.pkl"],
+            "y_test": ["data/y_test_flat.pkl", "y_test_flat.pkl"],
+            "y_pred": ["data/rf_y_pred.pkl", "rf_y_pred.pkl"],
+            "y_proba": ["data/rf_y_pred_proba.pkl", "rf_y_pred_proba.pkl"],
+        },
         "feature_data_candidates": [
             "data/rf_feature_importance.csv",
             "rf_feature_importance.csv",
@@ -208,6 +222,12 @@ MODEL_REGISTRY = {
             "xgboost_model.pkl",
             "xgboost_model (4).pkl",
         ],
+        "evaluation": {
+            "X_test": ["data/X_test_encoded.pkl", "X_test_encoded.pkl"],
+            "y_test": ["data/y_test_flat.pkl", "y_test_flat.pkl"],
+            "y_pred": ["data/xgb_y_pred.pkl", "xgb_y_pred.pkl"],
+            "y_proba": ["data/xgb_y_pred_proba.pkl", "xgb_y_pred_proba.pkl"],
+        },
         "feature_data_candidates": [
             "data/xgb_feature_importance.csv",
             "xgb_feature_importance.csv",
@@ -2316,6 +2336,39 @@ def load_model(path: str):
     return joblib.load(path)
 
 
+@st.cache_data(show_spinner=False)
+def load_first_joblib(candidates: Tuple[str, ...]):
+    """Load the first available saved evaluation object from candidate paths."""
+    path = first_existing_path(list(candidates))
+    if path is None:
+        raise FileNotFoundError("Required evaluation data is unavailable.")
+    return joblib.load(path), path
+
+
+@st.cache_resource(show_spinner=False)
+def load_prediction_model(model_name: str):
+    """
+    Load a trained classifier for live prediction.
+
+    Prediction availability is intentionally independent from the saved
+    evaluation results. A model only needs to load successfully and accept the
+    established 23-feature input schema.
+    """
+    errors = []
+    for model_path in MODEL_REGISTRY[model_name]["model_candidates"]:
+        if not Path(model_path).exists():
+            continue
+        try:
+            model = load_model(model_path)
+            return model, model_path
+        except Exception as exc:
+            errors.append(f"{model_path}: {exc}")
+
+    if errors:
+        raise RuntimeError(f"{model_name} could not be loaded for prediction.")
+    raise FileNotFoundError(f"{model_name} trained model is unavailable.")
+
+
 def get_data() -> Tuple[Optional[pd.DataFrame], Optional[pd.DataFrame], Optional[str]]:
     try:
         return load_dataset()
@@ -2998,60 +3051,83 @@ def _metrics_match_project(model_name: str, metrics: Dict[str, float]) -> bool:
 @st.cache_resource(show_spinner=False)
 def load_evaluation_bundle(model_name: str) -> Tuple[Optional[Dict], Optional[str]]:
     """
-    Select a trained classifier only when its actual behaviour reproduces the
-    established project evaluation on the exact fixed split/feature schema.
+    Load the project's saved held-out evaluation bundle.
 
-    Prediction/probability sidecar files are deliberately not used as metric
-    sources. This prevents stale outputs from overriding the trained classifier.
+    Evaluation and live prediction are deliberately separated:
+    - evaluation uses the matching saved X_test / y_test / y_pred / y_proba set;
+    - prediction loads the trained classifier independently.
+
+    This prevents a model file from a different export generation from
+    disabling the presentation's saved evaluation results.
     """
-    eval_data = build_project_evaluation_data()
-    X_eval = eval_data["X_test_encoded"]
-    y_true = eval_data["y_test"]
+    config = MODEL_REGISTRY[model_name]
+    eval_cfg = config.get("evaluation", {})
 
-    existing_paths = [
-        path
-        for path in MODEL_REGISTRY[model_name]["model_candidates"]
-        if Path(path).exists()
-    ]
-    if not existing_paths:
-        return None, f"{model_name} is unavailable because its trained model could not be found."
+    try:
+        X_test, _ = load_first_joblib(tuple(eval_cfg["X_test"]))
+        y_test, _ = load_first_joblib(tuple(eval_cfg["y_test"]))
+        y_pred, _ = load_first_joblib(tuple(eval_cfg["y_pred"]))
+        y_proba, _ = load_first_joblib(tuple(eval_cfg["y_proba"]))
+    except Exception:
+        return None, f"{model_name} evaluation results are unavailable."
 
-    for model_path in existing_paths:
+    try:
+        if not isinstance(X_test, pd.DataFrame):
+            X_test = pd.DataFrame(X_test)
+
+        y_true = np.asarray(y_test).ravel().astype(str)
+        y_pred = np.asarray(y_pred).ravel().astype(str)
+        y_proba = np.asarray(y_proba, dtype=float)
+        if y_proba.ndim > 2:
+            y_proba = np.squeeze(y_proba)
+
+        if len(y_true) != len(y_pred):
+            raise ValueError("Prediction length does not match the test labels.")
+        if y_proba.ndim != 2 or y_proba.shape[0] != len(y_true):
+            raise ValueError("Probability output does not match the test labels.")
+        if y_proba.shape[1] != len(XGB_CLASS_NAMES):
+            raise ValueError("Probability output must contain seven class columns.")
+        if not np.allclose(y_proba.sum(axis=1), 1.0, rtol=1e-5, atol=1e-5):
+            raise ValueError("Probability rows do not sum to one.")
+
+        # All four saved evaluation exports use the same seven-label ordering.
+        # This is also the LabelEncoder.classes_ order used for XGBoost.
+        classes = XGB_CLASS_NAMES.copy()
+        if not set(np.unique(y_true)).issubset(set(classes)):
+            raise ValueError("Unknown class found in the held-out labels.")
+        if not set(np.unique(y_pred)).issubset(set(classes)):
+            raise ValueError("Unknown class found in the saved predictions.")
+
+        metrics = calculate_evaluation_metrics(
+            y_true,
+            y_pred,
+            y_proba,
+            classes,
+        )
+
+        # A trained model is optional for evaluation-only views such as the
+        # confusion matrix and ROC curves. When available, attach it so the
+        # feature-analysis tab can still use model-specific information.
+        model = None
+        model_path = None
         try:
-            model = load_model(model_path)
-            _validate_feature_schema(model_name, model, X_eval)
-
-            raw_pred = np.asarray(model.predict(X_eval)).ravel()
-            y_pred = _decode_predictions(model_name, raw_pred)
-            y_proba = np.asarray(model.predict_proba(X_eval), dtype=float)
-            if y_proba.ndim > 2:
-                y_proba = np.squeeze(y_proba)
-
-            classes = get_model_classes(model_name, model)
-            metrics = calculate_evaluation_metrics(y_true, y_pred, y_proba, classes)
-
-            # The check is a model-selection safeguard, not a displayed value source.
-            if not _metrics_match_project(model_name, metrics):
-                continue
-
-            return {
-                "model": model,
-                "model_path": model_path,
-                "X_test": X_eval,
-                "y_true": y_true,
-                "y_pred": y_pred,
-                "y_proba": y_proba,
-                "classes": classes,
-                "metrics": metrics,
-            }, None
+            model, model_path = load_prediction_model(model_name)
         except Exception:
-            continue
+            pass
 
-    return (
-        None,
-        f"{model_name} is unavailable because the available trained model does not "
-        "match the project's fixed evaluation pipeline.",
-    )
+        return {
+            "model": model,
+            "model_path": model_path,
+            "X_test": X_test,
+            "y_true": y_true,
+            "y_pred": y_pred,
+            "y_proba": y_proba,
+            "classes": classes,
+            "metrics": metrics,
+        }, None
+
+    except Exception:
+        return None, f"{model_name} evaluation results are unavailable."
 
 
 def get_cv_dataframe() -> pd.DataFrame:
@@ -3389,8 +3465,29 @@ def strip_transformer_prefix(name: str) -> str:
 
 
 def model_feature_analysis(model_name: str, artifact: Dict) -> Tuple[Optional[pd.DataFrame], str, str]:
-    model = artifact["model"]
+    model = artifact.get("model")
     X_test = artifact["X_test"]
+
+    if model is None and model_name != "K-Nearest Neighbours (KNN)":
+        path = first_existing_path(MODEL_REGISTRY[model_name].get("feature_data_candidates", []))
+        if path is not None:
+            try:
+                df = pd.read_csv(path)
+                importance_col = next(
+                    (c for c in ["Importance", "Mean Importance", "Importance (mean drop in accuracy)"] if c in df.columns),
+                    None,
+                )
+                if "Feature" in df.columns and importance_col is not None:
+                    out = df[["Feature", importance_col]].copy()
+                    out.columns = ["Feature", "Importance"]
+                    return (
+                        out.sort_values("Importance", ascending=False).head(15),
+                        f"{model_name} feature analysis",
+                        "Feature values summarise the prepared model analysis for this classifier.",
+                    )
+            except Exception:
+                pass
+        return None, "Feature analysis unavailable", "Feature analysis is unavailable for this classifier."
 
     if model_name == "K-Nearest Neighbours (KNN)":
         path = first_existing_path(MODEL_REGISTRY[model_name]["feature_data_candidates"])
@@ -3516,20 +3613,30 @@ def aggregate_feature_importance(feature_df: pd.DataFrame) -> pd.DataFrame:
 # =============================================================================
 
 def get_prediction_columns(model_name: str, model) -> List[str]:
-    X_test = build_project_evaluation_data()["X_test_encoded"]
-    columns = X_test.columns.tolist()
+    project_columns = build_project_evaluation_data()["X_test_encoded"].columns.tolist()
+    project_set = set(project_columns)
+
+    model_names = None
 
     if model_name == "XGBoost" and hasattr(model, "get_booster"):
         booster_names = model.get_booster().feature_names
-        if booster_names and list(booster_names) != columns:
-            raise ValueError("XGBoost feature names do not match the project input schema.")
+        if booster_names:
+            model_names = [str(x) for x in booster_names]
 
-    if hasattr(model, "feature_names_in_"):
+    if model_names is None and hasattr(model, "feature_names_in_"):
         model_names = [str(x) for x in model.feature_names_in_]
-        if model_names != columns:
-            raise ValueError("Model feature names do not match the project input schema.")
 
-    return columns
+    if model_names is not None:
+        if len(model_names) != 23 or set(model_names) != project_set:
+            raise ValueError("Model feature schema is incompatible with the 23 project predictors.")
+        # Preserve the exact order expected by this trained model.
+        return model_names
+
+    if hasattr(model, "n_features_in_") and int(model.n_features_in_) != 23:
+        raise ValueError("Model feature count is incompatible with the project input schema.")
+
+    return project_columns
+
 
 def build_encoded_prediction_row(model_name: str, model, values: Dict) -> pd.DataFrame:
     columns = get_prediction_columns(model_name, model)
@@ -3562,11 +3669,7 @@ def build_encoded_prediction_row(model_name: str, model, values: Dict) -> pd.Dat
 
 
 def make_prediction(model_name: str, input_values: Dict) -> Dict:
-    bundle, error = load_evaluation_bundle(model_name)
-    if bundle is None:
-        raise RuntimeError(error or f"{model_name} is unavailable.")
-
-    model = bundle["model"]
+    model, _ = load_prediction_model(model_name)
     encoded_row = build_encoded_prediction_row(model_name, model, input_values)
 
     raw_pred = np.asarray(model.predict(encoded_row)).ravel()[0]
@@ -3704,7 +3807,7 @@ def render_overview_page(raw: pd.DataFrame, clean: pd.DataFrame) -> None:
             ("01", "Data", "Load the UCI obesity dataset and understand its 17 variables."),
             ("02", "Preparation", "Assess quality, remove 24 duplicates, split 70:30 with stratification, encode and scale where required."),
             ("03", "EDA", "Explore distributions, obesity-class relationships and appropriate association measures."),
-            ("04", "Modelling", "Compare Logistic Regression, KNN, Random Forest and XGBoost using saved project results."),
+            ("04", "Modelling", "Compare Logistic Regression, KNN, Random Forest and XGBoost using the held-out project evaluation."),
             ("05", "Evaluation", "Inspect class-level performance, ROC behaviour, stability and error patterns."),
             ("06", "Prediction", "Apply the saved trained models to an interactive 16-feature input form."),
         ]
@@ -4122,10 +4225,7 @@ def render_model_evaluation_page() -> None:
 
     bundle, error = load_evaluation_bundle(model_name)
     if bundle is None:
-        st.error(
-            f"{model_name} cannot be evaluated consistently with the project test data. "
-            "Please use the matching trained model for this project version."
-        )
+        st.error(f"{model_name} evaluation results are currently unavailable.")
         return
 
     metrics = bundle["metrics"]
@@ -4241,11 +4341,8 @@ def render_model_comparison_page() -> None:
     )
 
     comparison, artifacts, model_errors = build_comparison_dataframe()
-    if len(comparison) != len(MODEL_REGISTRY):
-        st.error(
-            "Model comparison is unavailable because one or more trained models cannot be "
-            "evaluated consistently with the project test data."
-        )
+    if comparison.empty:
+        st.error("Model comparison results are currently unavailable.")
         return
 
     # ============================================================
@@ -4342,7 +4439,7 @@ def render_model_comparison_page() -> None:
                 f"Gap from best: {gap_value}",
             )
         )
-    render_kpi_grid(scorecard_items, columns_per_row=4)
+    render_kpi_grid(scorecard_items, columns_per_row=min(4, max(1, len(scorecard_items))))
 
     chart_ranked = ranked.sort_values(
         rank_column,
@@ -4625,12 +4722,18 @@ def render_prediction_page() -> None:
         "Enter one profile, choose a trained model, and inspect the predicted obesity category and full class-probability distribution. This is an academic classification demonstration, not a medical diagnosis.",
     )
 
-    available_models = [
-        name for name in MODEL_REGISTRY
-        if load_evaluation_bundle(name)[0] is not None
-    ]
+    available_models = []
+    for name in MODEL_REGISTRY:
+        try:
+            model, _ = load_prediction_model(name)
+            # Validate that the model can accept the established prediction schema.
+            get_prediction_columns(name, model)
+            available_models.append(name)
+        except Exception:
+            continue
+
     if not available_models:
-        st.error("No trained model is currently available for consistent prediction.")
+        st.error("No trained model is currently available for prediction.")
         return
 
     model_name = st.selectbox("Prediction model", available_models, key="prediction_model")
