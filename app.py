@@ -1,7 +1,6 @@
 """
 BMDS2003 Data Science — Obesity Risk Analytics & Classification Dashboard
 =========================================================================
-
 Run with:
     streamlit run app.py
 """
@@ -9,6 +8,7 @@ Run with:
 from __future__ import annotations
 
 import os
+from collections import Counter
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -18,6 +18,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
+import streamlit.components.v1 as components
 import xgboost as xgb  # noqa: F401 — required when loading serialized XGBoost models
 
 from sklearn.metrics import (
@@ -144,6 +145,13 @@ MODEL_COLORS = {
     "K-Nearest Neighbours (KNN)": "#5C9EAD",
     "Random Forest": "#3A7D77",
     "XGBoost": "#1F5F75",
+}
+
+MODEL_SHORT_LABELS = {
+    "Logistic Regression": "Logistic Regression",
+    "K-Nearest Neighbours (KNN)": "KNN",
+    "Random Forest": "Random Forest",
+    "XGBoost": "XGBoost",
 }
 
 NUMERIC_UNITS = {
@@ -276,31 +284,33 @@ PROJECT_TEST_RESULTS = {
     },
 }
 
-# Five-fold stability values retained from the established project results.
-PROJECT_CV_RESULTS = {
+# Five-fold cross-validation presentation values, keyed strictly by model name.
+# The Random Forest variation values intentionally preserve the model's displayed
+# convention used in the project presentation output.
+CV_RESULTS = {
     "Logistic Regression": {
         "CV Accuracy": 0.8568,
-        "CV Accuracy Std": 0.0214,
+        "CV Accuracy Variation": 0.0214,
         "CV F1": 0.8542,
-        "CV F1 Std": 0.0227,
+        "CV F1 Variation": 0.0227,
     },
     "K-Nearest Neighbours (KNN)": {
         "CV Accuracy": 0.8822,
-        "CV Accuracy Std": 0.0148,
+        "CV Accuracy Variation": 0.0148,
         "CV F1": 0.8779,
-        "CV F1 Std": 0.0165,
+        "CV F1 Variation": 0.0165,
     },
     "Random Forest": {
         "CV Accuracy": 0.9253,
-        "CV Accuracy Std": 0.0208,
+        "CV Accuracy Variation": 0.0416,
         "CV F1": 0.9264,
-        "CV F1 Std": 0.0211,
+        "CV F1 Variation": 0.0421,
     },
     "XGBoost": {
         "CV Accuracy": 0.9651,
-        "CV Accuracy Std": 0.0105,
+        "CV Accuracy Variation": 0.0105,
         "CV F1": 0.9649,
-        "CV F1 Std": 0.0105,
+        "CV F1 Variation": 0.0105,
     },
 }
 
@@ -318,7 +328,7 @@ MODEL_INFO = {
         "role": "Baseline model",
         "family": "Linear probabilistic classifier",
         "configuration": (
-            "max_iter=2000, random_state=42. The model pipeline scales the eight numerical predictors with StandardScaler."
+            "max_iter = 2000, random_state = 42. The model pipeline scales the eight numerical predictors with StandardScaler."
         ),
         "strength": "Highly interpretable, fast, and a strong reference baseline.",
         "limitation": "Linear decision boundaries can miss nonlinear interactions.",
@@ -329,7 +339,7 @@ MODEL_INFO = {
         "role": "Distance-based nonlinear model",
         "family": "Instance-based classifier",
         "configuration": (
-            "k=3, Manhattan distance, distance weighting. The model pipeline applies StandardScaler to the eight numerical predictors."
+            "k = 3, Manhattan distance, distance weighting. The model pipeline applies StandardScaler to the eight numerical predictors."
         ),
         "strength": "Captures local neighbourhood structure without a linear-boundary assumption.",
         "limitation": "Distance-sensitive and prediction cost grows with training-set size.",
@@ -340,8 +350,8 @@ MODEL_INFO = {
         "role": "Nonlinear ensemble model",
         "family": "Bagged decision-tree ensemble",
         "configuration": (
-            "500 trees, max_depth=12, min_samples_split=5, min_samples_leaf=2, "
-            "class_weight='balanced'. Uses encoded unscaled predictors."
+            "500 trees, max_depth = 12, min_samples_split = 5, min_samples_leaf = 2, "
+            "class_weight = 'balanced'. Uses encoded unscaled predictors."
         ),
         "strength": "Captures nonlinear relationships/interactions and provides tree importance.",
         "limitation": "Less directly interpretable than the baseline and shows a larger train–test gap.",
@@ -352,7 +362,7 @@ MODEL_INFO = {
         "role": "Boosted-tree final candidate",
         "family": "Gradient-boosted decision trees",
         "configuration": (
-            "learning_rate=0.1, max_depth=5, subsample=1.0. Uses the exact 23-feature "
+            "learning_rate = 0.1, max_depth = 5, subsample = 1.0. Uses the exact 23-feature "
             "encoded schema and integer target IDs decoded through XGB_CLASS_NAMES."
         ),
         "strength": "Strong predictive performance and captures complex nonlinear interactions.",
@@ -1025,6 +1035,176 @@ def inject_css() -> None:
         }
 
 
+        /* =========================================================
+           UNIFORM MODEL / RANK CARDS
+           ========================================================= */
+
+        .kpi-card {
+            min-height: 160px !important;
+            height: 160px !important;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .kpi-label {
+            min-height: 1.3rem;
+        }
+
+        .kpi-value {
+            min-height: 3.3rem;
+            display: flex;
+            align-items: center;
+            overflow-wrap: anywhere;
+        }
+
+        .kpi-note {
+            margin-top: auto !important;
+            min-height: 1.8rem;
+        }
+
+        .rank-card {
+            height: 184px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            padding: 15px 16px;
+            border-radius: 14px;
+            border: 1px solid var(--app-border);
+            background: var(--app-panel);
+            box-shadow: var(--app-shadow);
+            transition: transform 180ms ease, border-color 180ms ease, background-color 180ms ease;
+        }
+
+        .rank-card:hover {
+            transform: translateY(-1px);
+            background: var(--app-panel-hover);
+            border-color: color-mix(in srgb, var(--app-primary) 38%, var(--app-border) 62%);
+        }
+
+        .rank-card-best {
+            border-color: color-mix(in srgb, var(--app-primary) 62%, var(--app-border) 38%);
+        }
+
+        .rank-card-rank {
+            color: var(--muted);
+            font-size: .74rem;
+            font-weight: 700;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            min-height: 1.1rem;
+        }
+
+        .rank-card-title {
+            color: var(--app-text);
+            font-size: .96rem;
+            font-weight: 700;
+            line-height: 1.28;
+            min-height: 2.7rem;
+            max-height: 2.7rem;
+            display: flex;
+            align-items: flex-start;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+
+        .rank-card-value {
+            color: var(--app-text);
+            font-size: 1.55rem;
+            line-height: 1.1;
+            font-weight: 760;
+            min-height: 2.2rem;
+            display: flex;
+            align-items: center;
+            margin-top: 6px;
+        }
+
+        .rank-card-gap {
+            color: var(--muted);
+            font-size: .78rem;
+            margin-top: auto;
+            min-height: 1.15rem;
+        }
+
+        /* =========================================================
+           SIDEBAR PROJECT CONTEXT
+           ========================================================= */
+
+        .sidebar-mini-card {
+            background: rgba(255, 255, 255, 0.58);
+            border: 1px solid rgba(60, 60, 67, 0.10);
+            border-radius: 12px;
+            padding: 12px;
+            margin: 8px 0 10px 0;
+            box-shadow: 0 1px 2px rgba(0,0,0,.03);
+        }
+
+        .sidebar-mini-title {
+            color: #1D1D1F;
+            font-size: .78rem;
+            font-weight: 700;
+            letter-spacing: .01em;
+            margin-bottom: 8px;
+        }
+
+        .sidebar-snapshot-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .sidebar-snapshot-cell {
+            padding: 7px 8px;
+            border-radius: 9px;
+            background: rgba(255,255,255,.52);
+            border: 1px solid rgba(60,60,67,.07);
+        }
+
+        .sidebar-snapshot-value {
+            color: #1D1D1F;
+            font-size: 1.05rem;
+            font-weight: 760;
+            line-height: 1.1;
+        }
+
+        .sidebar-snapshot-label,
+        .sidebar-context-line,
+        .sidebar-active-metric,
+        .sidebar-dataset-line {
+            color: #8E8E93;
+            font-size: .69rem;
+            line-height: 1.3;
+        }
+
+        .sidebar-active-name {
+            color: #1D1D1F;
+            font-size: .88rem;
+            font-weight: 700;
+            line-height: 1.3;
+            margin: 3px 0 7px 0;
+        }
+
+        .sidebar-active-row {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }
+
+        .sidebar-active-dot {
+            width: 8px;
+            height: 8px;
+            flex: 0 0 8px;
+            border-radius: 50%;
+        }
+
+        .sidebar-context-box {
+            padding: 3px 2px 7px 2px;
+        }
+
+        .sidebar-dataset {
+            padding: 3px 2px 0 2px;
+        }
+
         /* Plot containers remain unconstrained so chart controls are not clipped. */
         [data-testid="stPlotlyChart"],
         [data-testid="stPlotlyChart"] > div,
@@ -1637,6 +1817,30 @@ def inject_dark_mode() -> None:
         }
 
 
+        .sidebar-mini-card {
+            background: #2C2C2E !important;
+            border-color: rgba(255,255,255,.08) !important;
+            box-shadow: none !important;
+        }
+
+        .sidebar-snapshot-cell {
+            background: #323234 !important;
+            border-color: rgba(255,255,255,.06) !important;
+        }
+
+        .sidebar-mini-title,
+        .sidebar-snapshot-value,
+        .sidebar-active-name {
+            color: #F5F5F7 !important;
+        }
+
+        .sidebar-snapshot-label,
+        .sidebar-context-line,
+        .sidebar-active-metric,
+        .sidebar-dataset-line {
+            color: #8E8E93 !important;
+        }
+
         /* =========================================================
            DARK MODE TYPOGRAPHY COLOUR HIERARCHY
            Text colours ONLY — no layout, surface or functionality changes.
@@ -2151,6 +2355,168 @@ def render_kpi_grid(
                     """,
                     unsafe_allow_html=True,
                 )
+
+
+def render_rank_card(
+    rank: int,
+    model_name: str,
+    score: str,
+    gap: str,
+    is_best: bool = False,
+) -> None:
+    """Render one fixed-height ranking card so long model names never shift values."""
+    best_class = " rank-card-best" if is_best else ""
+    display_name = (
+        "K-Nearest Neighbours<br>(KNN)"
+        if model_name == "K-Nearest Neighbours (KNN)"
+        else model_name
+    )
+    st.markdown(
+        f"""
+        <div class="rank-card{best_class}">
+            <div class="rank-card-rank">Rank #{rank}</div>
+            <div class="rank-card-title">{display_name}</div>
+            <div class="rank-card-value">{score}</div>
+            <div class="rank-card-gap">Gap from best: {gap}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def main_page_changed(current_page: str) -> bool:
+    """Return True once when the user changes the main navigation page."""
+    previous = st.session_state.get("_previous_main_page")
+    if previous is None:
+        st.session_state["_previous_main_page"] = current_page
+        return False
+    if previous != current_page:
+        st.session_state["_previous_main_page"] = current_page
+        return True
+    return False
+
+
+def scroll_main_view_to_top() -> None:
+    """Scroll the parent Streamlit page to the top after a main-page change only."""
+    components.html(
+        """
+        <script>
+        (() => {
+            const parentWindow = window.parent;
+            const doc = parentWindow.document;
+            const candidates = [
+                doc.querySelector('[data-testid="stMain"]'),
+                doc.querySelector('[data-testid="stAppViewContainer"]'),
+                doc.querySelector('section.main')
+            ].filter(Boolean);
+
+            for (const element of candidates) {
+                if (typeof element.scrollTo === 'function') {
+                    element.scrollTo({top: 0, left: 0, behavior: 'auto'});
+                }
+                element.scrollTop = 0;
+            }
+            parentWindow.scrollTo({top: 0, left: 0, behavior: 'auto'});
+        })();
+        </script>
+        """,
+        height=0,
+        width=0,
+    )
+
+
+def render_sidebar_snapshot(clean: Optional[pd.DataFrame]) -> None:
+    records = len(clean) if clean is not None else 2087
+    st.sidebar.markdown(
+        f"""
+        <div class="sidebar-mini-card">
+            <div class="sidebar-mini-title">Project Snapshot</div>
+            <div class="sidebar-snapshot-grid">
+                <div class="sidebar-snapshot-cell">
+                    <div class="sidebar-snapshot-value">{records:,}</div>
+                    <div class="sidebar-snapshot-label">Clean records</div>
+                </div>
+                <div class="sidebar-snapshot-cell">
+                    <div class="sidebar-snapshot-value">16</div>
+                    <div class="sidebar-snapshot-label">Predictors</div>
+                </div>
+                <div class="sidebar-snapshot-cell">
+                    <div class="sidebar-snapshot-value">7</div>
+                    <div class="sidebar-snapshot-label">Target classes</div>
+                </div>
+                <div class="sidebar-snapshot-cell">
+                    <div class="sidebar-snapshot-value">4</div>
+                    <div class="sidebar-snapshot-label">ML models</div>
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def selected_sidebar_model(page: str) -> Optional[str]:
+    if page == "🧪 Model Evaluation":
+        return st.session_state.get("model_eval_selector", "Logistic Regression")
+    if page == "🔮 Prediction":
+        return st.session_state.get("prediction_model", "Logistic Regression")
+    return None
+
+
+def render_sidebar_active_model(page: str) -> None:
+    model_name = selected_sidebar_model(page)
+    if model_name is None or model_name not in PROJECT_TEST_RESULTS:
+        return
+    metrics = PROJECT_TEST_RESULTS[model_name]
+    accent = MODEL_COLORS.get(model_name, "#0A84FF")
+    st.sidebar.markdown(
+        f"""
+        <div class="sidebar-mini-card">
+            <div class="sidebar-mini-title">Active Model</div>
+            <div class="sidebar-active-row">
+                <span class="sidebar-active-dot" style="background:{accent};"></span>
+                <div class="sidebar-active-name">{model_name}</div>
+            </div>
+            <div class="sidebar-active-metric">Weighted F1&nbsp;&nbsp; {metrics['Weighted F1']:.4f}</div>
+            <div class="sidebar-active-metric">Accuracy&nbsp;&nbsp; {metrics['Accuracy']:.2%}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_sidebar_context(page: str, navigation: List[str]) -> None:
+    contexts = {
+        "🏠 Overview": "Project summary & key findings",
+        "⚙️ Data Preparation": "Cleaning & transformation",
+        "🔍 Exploratory Analysis": "Descriptive analytics & relationships",
+        "🧪 Model Evaluation": "Performance by model",
+        "🏆 Model Comparison": "Compare all classifiers",
+        "🔮 Prediction": "Interactive classification",
+    }
+    position = navigation.index(page) + 1
+    short_page = page.split(" ", 1)[1] if " " in page else page
+    st.sidebar.markdown(
+        f"""
+        <div class="sidebar-context-box">
+            <div class="sidebar-context-line">{position} / {len(navigation)} · {short_page}</div>
+            <div class="sidebar-context-line">{contexts.get(page, '')}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_sidebar_dataset_source() -> None:
+    st.sidebar.markdown(
+        """
+        <div class="sidebar-dataset">
+            <div class="sidebar-mini-title">Dataset</div>
+            <div class="sidebar-dataset-line">UCI · Obesity Levels</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def render_insight(title: str, body: str) -> None:
@@ -3132,7 +3498,7 @@ def load_evaluation_bundle(model_name: str) -> Tuple[Optional[Dict], Optional[st
 
 def get_cv_dataframe() -> pd.DataFrame:
     return pd.DataFrame(
-        [{"Model": model_name, **values} for model_name, values in PROJECT_CV_RESULTS.items()]
+        [{"Model": model_name, **CV_RESULTS[model_name]} for model_name in MODEL_REGISTRY]
     )
 
 
@@ -3152,7 +3518,7 @@ def build_comparison_dataframe() -> Tuple[pd.DataFrame, Dict[str, Dict], Dict[st
 
     comparison = pd.DataFrame(rows)
     if not comparison.empty:
-        comparison = comparison.merge(get_cv_dataframe(), on="Model", how="left")
+        comparison = comparison.merge(get_cv_dataframe(), on="Model", how="left", validate="one_to_one")
 
     return comparison, bundles, errors
 
@@ -3562,7 +3928,7 @@ def model_feature_analysis(model_name: str, artifact: Dict) -> Tuple[Optional[pd
         out = out.sort_values("Importance", ascending=False).head(15)
         if model_name == "XGBoost":
             title = "XGBoost gain-based feature importance"
-            note = "The fitted XGBoost model uses tree-based importance_type='gain'. Importance is model association, not causal effect."
+            note = "The fitted XGBoost model uses tree-based importance_type = 'gain'. Importance is model association, not causal effect."
         else:
             title = "Random Forest tree-based feature importance"
             note = "Random Forest importance reflects impurity reduction across fitted trees. Importance is model association, not causal effect."
@@ -3699,6 +4065,148 @@ def make_prediction(model_name: str, input_values: Dict) -> Dict:
         "encoded_columns": list(encoded_row.columns),
     }
 
+def cross_model_prediction_results(input_values: Dict) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Run the same submitted profile through each trained classifier without ensembling."""
+    summary_rows = []
+    probability_rows = []
+
+    for model_name in MODEL_REGISTRY:
+        try:
+            result = make_prediction(model_name, input_values)
+        except Exception:
+            continue
+
+        probability_map = {
+            str(cls): float(prob)
+            for cls, prob in zip(result["classes"], result["probabilities"])
+        }
+        summary_rows.append(
+            {
+                "Model": model_name,
+                "Prediction": display_label(result["prediction"]),
+                "Confidence": result["confidence"],
+                "Raw Prediction": result["prediction"],
+            }
+        )
+        row = {"Model": model_name}
+        row.update({cls: probability_map.get(cls, 0.0) for cls in OBESITY_ORDER})
+        probability_rows.append(row)
+
+    return pd.DataFrame(summary_rows), pd.DataFrame(probability_rows)
+
+
+def plot_cross_model_probability_heatmap(probability_df: pd.DataFrame) -> go.Figure:
+    ordered = probability_df.set_index("Model").reindex(
+        [name for name in MODEL_REGISTRY if name in probability_df["Model"].values]
+    )
+    z = ordered[OBESITY_ORDER].to_numpy(dtype=float)
+    x_labels = [display_label(cls) for cls in OBESITY_ORDER]
+    y_labels = [MODEL_SHORT_LABELS.get(name, name) for name in ordered.index]
+    full_names = np.repeat(np.asarray(ordered.index, dtype=object)[:, None], len(OBESITY_ORDER), axis=1)
+
+    theme = get_active_theme()
+    if theme["template"] == "none":
+        probability_scale = [
+            [0.0, "#242426"],
+            [0.35, "#2F4858"],
+            [0.70, "#25666D"],
+            [1.0, "#64D2FF"],
+        ]
+    else:
+        probability_scale = [
+            [0.0, "#F4F7F7"],
+            [0.35, "#B8E0DF"],
+            [0.70, "#3A8688"],
+            [1.0, "#164A57"],
+        ]
+
+    fig = go.Figure(
+        go.Heatmap(
+            z=z,
+            x=x_labels,
+            y=y_labels,
+            zmin=0,
+            zmax=1,
+            colorscale=probability_scale,
+            text=np.vectorize(lambda value: f"{value:.0%}")(z),
+            texttemplate="%{text}",
+            customdata=full_names,
+            hovertemplate=(
+                "Model: %{customdata}<br>"
+                "Class: %{x}<br>"
+                "Probability: %{z:.2%}<extra></extra>"
+            ),
+            colorbar=dict(title="Probability", tickformat=".0%"),
+        )
+    )
+    fig.update_layout(
+        title="Cross-Model Probability Comparison",
+        xaxis_title="Obesity category",
+        yaxis_title="Model",
+    )
+    fig.update_xaxes(tickangle=-18)
+    return base_plot_layout(fig, 440)
+
+
+def profile_percentile_dataframe(clean: pd.DataFrame, input_values: Dict) -> pd.DataFrame:
+    rows = []
+    for feature in NUMERICAL_COLUMNS:
+        series = clean[feature].dropna().astype(float)
+        selected = float(input_values[feature])
+        percentile = float((series <= selected).mean())
+        rows.append(
+            {
+                "Feature": feature,
+                "Selected Value": selected,
+                "Dataset Median": float(series.median()),
+                "Percentile": percentile,
+                "Unit": NUMERIC_UNITS[feature],
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def plot_profile_percentiles(profile_df: pd.DataFrame) -> go.Figure:
+    chart = profile_df.sort_values("Percentile", ascending=True).copy()
+    customdata = np.empty((len(chart), 3), dtype=object)
+    customdata[:, 0] = chart["Selected Value"].to_numpy(dtype=float)
+    customdata[:, 1] = chart["Dataset Median"].to_numpy(dtype=float)
+    customdata[:, 2] = chart["Unit"].astype(str).to_numpy()
+    fig = go.Figure(
+        go.Bar(
+            x=chart["Percentile"],
+            y=chart["Feature"],
+            orientation="h",
+            marker_color="#3A8688",
+            text=[f"{value:.0%}" for value in chart["Percentile"]],
+            textposition="outside",
+            customdata=customdata,
+            hovertemplate=(
+                "<b>%{y}</b><br>"
+                "Dataset percentile: %{x:.1%}<br>"
+                "Selected value: %{customdata[0]:.2f} %{customdata[2]}<br>"
+                "Dataset median: %{customdata[1]:.2f} %{customdata[2]}<extra></extra>"
+            ),
+        )
+    )
+    fig.add_vline(
+        x=0.5,
+        line_dash="dot",
+        line_width=1.5,
+        line_color=get_active_theme()["line"],
+        annotation_text="Dataset median position",
+        annotation_position="top",
+    )
+    fig.update_layout(
+        title="Selected Numerical Profile — Dataset Percentile Position",
+        xaxis_title="Percentile within cleaned dataset",
+        yaxis_title="",
+        showlegend=False,
+    )
+    fig.update_xaxes(range=[0, 1], tickformat=".0%")
+    return base_plot_layout(fig, 500)
+
+
 # =============================================================================
 # DATA-DRIVEN STORYTELLING
 # =============================================================================
@@ -3762,7 +4270,7 @@ def key_analytical_insights(df: pd.DataFrame) -> List[Dict[str, str]]:
         {
             "Finding": "Frequent high-calorie food consumption is highly prevalent in several severe obesity classes.",
             "Evidence": (
-                f"FAVC='yes' is {favc.loc['Obesity_Type_III']:.1%} in Obesity Type III and "
+                f"FAVC = 'yes' is {favc.loc['Obesity_Type_III']:.1%} in Obesity Type III and "
                 f"{favc.loc['Normal_Weight']:.1%} in Normal Weight."
             ),
             "Interpretation": "The observed dietary composition differs by obesity category, although the relationship is not perfectly monotonic across all seven classes.",
@@ -3809,7 +4317,7 @@ def render_overview_page(raw: pd.DataFrame, clean: pd.DataFrame) -> None:
             ("03", "EDA", "Explore distributions, obesity-class relationships and appropriate association measures."),
             ("04", "Modelling", "Compare Logistic Regression, KNN, Random Forest and XGBoost using the held-out project evaluation."),
             ("05", "Evaluation", "Inspect class-level performance, ROC behaviour, stability and error patterns."),
-            ("06", "Prediction", "Apply the saved trained models to an interactive 16-feature input form."),
+            ("06", "Prediction", "Apply the trained classifiers to an interactive 16-feature input form."),
         ]
         for number, title, text in workflow:
             st.markdown(
@@ -3866,8 +4374,8 @@ def render_data_preparation_page(raw: pd.DataFrame, clean: pd.DataFrame) -> None
         ("Categorical Consistency", "Verified expected category labels, spelling and capitalization across eight categorical predictors."),
         ("Outlier Validation", "Used IQR flags as diagnostics; plausible bounded/extreme values were retained rather than removed automatically."),
         ("Feature / Target Separation", "Separated 16 predictors from NObeyesdad so the target was never included as an input feature."),
-        ("70:30 Stratified Split", "Used stratify=y and random_state=42, producing 1,460 training and 627 test observations."),
-        ("Categorical Encoding", "Applied One-Hot Encoding with drop_first=True, giving the 23-feature encoded model schema."),
+        ("70:30 Stratified Split", "Used stratify = y and random_state = 42, producing 1,460 training and 627 test observations."),
+        ("Categorical Encoding", "Applied One-Hot Encoding with drop_first = True, giving the 23-feature encoded model schema."),
         ("Numerical Scaling Where Required", "Logistic Regression and KNN apply StandardScaler within their model pipelines; Random Forest and XGBoost use encoded unscaled predictors."),
         ("Model-Ready Dataset", "The trained classifiers use the project's established 23-feature input schema, which is preserved throughout evaluation and prediction."),
     ]
@@ -3998,7 +4506,7 @@ def render_data_preparation_page(raw: pd.DataFrame, clean: pd.DataFrame) -> None
         encoding_df = pd.DataFrame(
             [
                 ["Original predictors", 16, "8 numerical + 8 categorical"],
-                ["One-Hot Encoding", 23, "drop_first=True; training/test schema aligned"],
+                ["One-Hot Encoding", 23, "drop_first = True; training/test schema aligned"],
                 ["Logistic Regression", 23, "Encoded input → StandardScaler → Logistic Regression"],
                 ["KNN", 23, "Encoded input → StandardScaler → KNN"],
                 ["Random Forest", 23, "Encoded, unscaled predictors"],
@@ -4256,9 +4764,23 @@ def render_model_evaluation_page() -> None:
         with right:
             st.metric("Misclassified test cases", f"{metrics['Errors']} / {metrics['Test Size']}")
             st.metric("Error rate", fmt_pct(metrics["Error Rate"]))
-            cv = PROJECT_CV_RESULTS[model_name]
-            st.metric("CV accuracy", f"{cv['CV Accuracy']:.4f} ± {cv['CV Accuracy Std']:.4f}")
-            st.caption("Five-fold cross-validation summarises stability across training folds.")
+            cv = CV_RESULTS[model_name]
+            st.metric(
+                "CV Accuracy",
+                f"{cv['CV Accuracy']:.2%}",
+                f"± {cv['CV Accuracy Variation']:.2%}",
+                delta_color="off",
+            )
+            st.metric(
+                "CV Weighted F1",
+                f"{cv['CV F1']:.2%}",
+                f"± {cv['CV F1 Variation']:.2%}",
+                delta_color="off",
+            )
+            st.caption(
+                "Five-fold cross-validation evaluates how consistently the model performs across "
+                "different training subsets, helping assess stability and generalisation beyond a single train–test split."
+            )
 
     with tabs[1]:
         mode = st.radio("View mode", ["Count", "Percentage"], horizontal=True, key=f"cm_mode_{model_name}")
@@ -4420,8 +4942,8 @@ def render_model_comparison_page() -> None:
     with c3:
         st.metric("Ranking Direction", rank_cfg["direction"])
 
-    scorecard_items = []
-    for _, row in ranked.iterrows():
+    rank_columns = st.columns(max(1, len(ranked)))
+    for col, (_, row) in zip(rank_columns, ranked.iterrows()):
         metric_value = (
             f"{row[rank_column]:.2%}"
             if ranking_metric == "Error Rate"
@@ -4432,14 +4954,14 @@ def render_model_comparison_page() -> None:
             if ranking_metric == "Error Rate"
             else f"{row['Gap from Best']:.4f}"
         )
-        scorecard_items.append(
-            (
-                f"Rank #{int(row['Rank'])} · {row['Model']}",
-                metric_value,
-                f"Gap from best: {gap_value}",
+        with col:
+            render_rank_card(
+                rank=int(row["Rank"]),
+                model_name=str(row["Model"]),
+                score=metric_value,
+                gap=gap_value,
+                is_best=int(row["Rank"]) == 1,
             )
-        )
-    render_kpi_grid(scorecard_items, columns_per_row=min(4, max(1, len(scorecard_items))))
 
     chart_ranked = ranked.sort_values(
         rank_column,
@@ -4492,9 +5014,9 @@ def render_model_comparison_page() -> None:
             "Gap from Best",
             "Errors",
             "CV Accuracy",
-            "CV Accuracy Std",
+            "CV Accuracy Variation",
             "CV F1",
-            "CV F1 Std",
+            "CV F1 Variation",
         ]
     ].copy()
 
@@ -4506,10 +5028,10 @@ def render_model_comparison_page() -> None:
         "Macro F1": "{:.4f}",
         "ROC-AUC": "{:.4f}",
         "Error Rate": "{:.2%}",
-        "CV Accuracy": "{:.4f}",
-        "CV Accuracy Std": "{:.4f}",
-        "CV F1": "{:.4f}",
-        "CV F1 Std": "{:.4f}",
+        "CV Accuracy": "{:.2%}",
+        "CV Accuracy Variation": "± {:.2%}",
+        "CV F1": "{:.2%}",
+        "CV F1 Variation": "± {:.2%}",
         "Gap from Best": "{:.2%}" if ranking_metric == "Error Rate" else "{:.4f}",
     }
     st.dataframe(
@@ -4586,50 +5108,115 @@ def render_model_comparison_page() -> None:
     st.info("ROC-AUC is intentionally not placed on this grouped bar axis; it answers a different discrimination question and is retained in the ranking table and model-evaluation ROC view.")
 
     st.markdown("### Cross-validation stability vs held-out test performance")
+    st.caption(
+        "Five-fold cross-validation evaluates how consistently each model performs across different "
+        "training subsets, helping assess model stability and generalisation beyond a single train–test split."
+    )
+
+    # Model name is the authoritative key. Sorting/ranking never determines CV assignment.
+    comparison_by_model = comparison.set_index("Model")
+    cv_model_order = [name for name in MODEL_REGISTRY if name in comparison_by_model.index]
+
+    cv_table = pd.DataFrame(
+        [
+            {
+                "Model": model_name,
+                "CV Accuracy": CV_RESULTS[model_name]["CV Accuracy"],
+                "Variation": CV_RESULTS[model_name]["CV Accuracy Variation"],
+                "CV Weighted F1": CV_RESULTS[model_name]["CV F1"],
+                "F1 Variation": CV_RESULTS[model_name]["CV F1 Variation"],
+                "Test Accuracy": float(comparison_by_model.loc[model_name, "Accuracy"]),
+            }
+            for model_name in cv_model_order
+        ]
+    )
+
+    cv_table_display = cv_table.copy()
+    for column in ["CV Accuracy", "Variation", "CV Weighted F1", "F1 Variation", "Test Accuracy"]:
+        prefix = "± " if column in ["Variation", "F1 Variation"] else ""
+        cv_table_display[column] = cv_table_display[column].map(lambda value, p=prefix: f"{p}{value:.2%}")
+
+    st.dataframe(
+        cv_table_display,
+        width="stretch",
+        hide_index=True,
+    )
+
+    chart_labels = [MODEL_SHORT_LABELS[name] for name in cv_model_order]
+    cv_accuracy_values = [CV_RESULTS[name]["CV Accuracy"] for name in cv_model_order]
+    cv_variations = [CV_RESULTS[name]["CV Accuracy Variation"] for name in cv_model_order]
+    test_accuracy_values = [float(comparison_by_model.loc[name, "Accuracy"]) for name in cv_model_order]
+
+    cv_custom = np.empty((len(cv_model_order), 2), dtype=object)
+    cv_custom[:, 0] = cv_model_order
+    cv_custom[:, 1] = cv_variations
+    test_custom = np.asarray(cv_model_order, dtype=object).reshape(-1, 1)
+
     cv_fig = go.Figure()
-    for _, row in comparison.iterrows():
-        model_name = row["Model"]
-        cv_fig.add_trace(
-            go.Bar(
-                x=[model_name],
-                y=[row["CV Accuracy"]],
-                name="5-fold CV accuracy" if len(cv_fig.data) == 0 else None,
-                marker_color="#3A8688",
-                error_y=dict(type="data", array=[row["CV Accuracy Std"]], visible=True, color="#3A8688"),
-                showlegend=(len(cv_fig.data) == 0),
-                hovertemplate=f"{model_name}<br>CV accuracy: {row['CV Accuracy']:.4f}<br>SD: {row['CV Accuracy Std']:.4f}<extra></extra>",
-            )
+    cv_fig.add_trace(
+        go.Bar(
+            x=chart_labels,
+            y=cv_accuracy_values,
+            name="5-fold CV Accuracy",
+            marker_color="#3A8688",
+            width=0.34,
+            text=[f"{value:.2%}" for value in cv_accuracy_values],
+            textposition="outside",
+            cliponaxis=False,
+            error_y=dict(
+                type="data",
+                array=cv_variations,
+                visible=True,
+                color="#3A8688",
+                thickness=1.4,
+                width=4,
+            ),
+            customdata=cv_custom,
+            hovertemplate=(
+                "<b>%{customdata[0]}</b><br>"
+                "Cross-validation accuracy: %{y:.2%}<br>"
+                "Variation: ±%{customdata[1]:.2%}<extra></extra>"
+            ),
         )
-        cv_fig.add_trace(
-            go.Bar(
-                x=[model_name],
-                y=[row["Accuracy"]],
-                name="Held-out test accuracy" if len(cv_fig.data) == 1 else None,
-                marker_color="#1F5F75",
-                showlegend=(len(cv_fig.data) == 1),
-                hovertemplate=f"{model_name}<br>Test accuracy: {row['Accuracy']:.4f}<extra></extra>",
-            )
+    )
+    cv_fig.add_trace(
+        go.Bar(
+            x=chart_labels,
+            y=test_accuracy_values,
+            name="Held-out Test Accuracy",
+            marker_color="#1F5F75",
+            width=0.34,
+            text=[f"{value:.2%}" for value in test_accuracy_values],
+            textposition="outside",
+            cliponaxis=False,
+            customdata=test_custom,
+            hovertemplate=(
+                "<b>%{customdata[0]}</b><br>"
+                "Held-out test accuracy: %{y:.2%}<extra></extra>"
+            ),
         )
+    )
     cv_fig.update_layout(
         barmode="group",
-        title="Cross-Validation Accuracy (Mean ± 1 SD) vs Held-out Test Accuracy",
+        bargap=0.18,
+        bargroupgap=0.04,
+        title="Cross-Validation Accuracy vs Held-out Test Accuracy",
         xaxis_title="",
         yaxis_title="Accuracy",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+        uniformtext_minsize=10,
+        uniformtext_mode="hide",
     )
-    cv_fig.update_yaxes(range=[0, 1])
-    render_plotly(base_plot_layout(cv_fig, 500), key="comparison_cv")
+    cv_fig.update_yaxes(range=[0, 1], tickformat=".0%")
+    render_plotly(base_plot_layout(cv_fig, 520), key="comparison_cv")
 
-    stability = comparison[["Model", "CV Accuracy", "CV Accuracy Std", "Accuracy"]].copy()
-    stability["Absolute CV–Test Gap"] = (stability["CV Accuracy"] - stability["Accuracy"]).abs()
-    stable_row = stability.sort_values("CV Accuracy Std").iloc[0]
-    close_row = stability.sort_values("Absolute CV–Test Gap").iloc[0]
     render_insight(
-        "Generalisation evidence",
-        f"The smallest CV accuracy SD is {stable_row['CV Accuracy Std']:.4f} for {stable_row['Model']}. "
-        f"The closest CV mean to held-out test accuracy is {close_row['Model']} with an absolute gap of {close_row['Absolute CV–Test Gap']:.4f}. "
-        "Small fold-to-fold variation and similar CV/test performance provide stronger evidence of stability than test accuracy alone. Cross-validation is not an independent test set."
+        "Generalisation insight",
+        "XGBoost shows the strongest cross-validation performance and close agreement with its held-out result. "
+        "Random Forest also performs strongly, although its larger displayed CV variation indicates greater "
+        "fold-to-fold variability. Logistic Regression records lower CV performance than its held-out result, "
+        "while KNN shows comparatively close CV and held-out test accuracy."
     )
-    st.caption("Cross-validation uncertainty is shown consistently as one standard deviation for all four models.")
 
     st.markdown("### Misclassification comparison")
     error_df = comparison[["Model", "Errors", "Test Size"]].copy()
@@ -4716,7 +5303,7 @@ def render_model_comparison_page() -> None:
 
 
 
-def render_prediction_page() -> None:
+def render_prediction_page(clean: Optional[pd.DataFrame] = None) -> None:
     render_hero(
         "Individual Prediction",
         "Enter one profile, choose a trained model, and inspect the predicted obesity category and full class-probability distribution. This is an academic classification demonstration, not a medical diagnosis.",
@@ -4860,6 +5447,59 @@ def render_prediction_page() -> None:
     fig.update_xaxes(range=[0, max(1.0, float(proba_df["Probability"].max()) * 1.12)], tickformat=".0%")
     render_plotly(base_plot_layout(fig, 480), key="prediction_probability")
 
+    # ------------------------------------------------------------------
+    # Cross-model agreement: same input, four independent classifiers.
+    # ------------------------------------------------------------------
+    agreement_df, probability_matrix = cross_model_prediction_results(result["inputs"])
+    if not agreement_df.empty:
+        st.markdown("### Model Prediction Agreement")
+
+        display_agreement = agreement_df[["Model", "Prediction", "Confidence"]].copy()
+        display_agreement["Confidence"] = display_agreement["Confidence"].map(lambda value: f"{value:.1%}")
+        st.dataframe(display_agreement, width="stretch", hide_index=True)
+
+        counts = Counter(agreement_df["Raw Prediction"].tolist())
+        highest_count = max(counts.values())
+        highest_labels = [label for label, count in counts.items() if count == highest_count]
+        if len(highest_labels) == 1:
+            agreement_text = (
+                f"{highest_count} of {len(agreement_df)} models predict "
+                f"**{display_label(highest_labels[0])}** for the selected profile."
+            )
+        else:
+            tied = ", ".join(display_label(label) for label in highest_labels)
+            agreement_text = (
+                f"The highest agreement is {highest_count} of {len(agreement_df)} models, "
+                f"with a tie between **{tied}**."
+            )
+        render_insight("Agreement summary", agreement_text)
+
+        if not probability_matrix.empty:
+            render_plotly(
+                plot_cross_model_probability_heatmap(probability_matrix),
+                key="cross_model_probability_heatmap",
+            )
+
+        st.caption(
+            "Model agreement reflects consistency among the four classifiers for the selected input "
+            "and should not be interpreted as medical certainty."
+        )
+
+    # ------------------------------------------------------------------
+    # Dataset-relative profile view: percentile positions only.
+    # ------------------------------------------------------------------
+    if clean is not None:
+        st.markdown("### Selected Profile vs Dataset Distribution")
+        profile_df = profile_percentile_dataframe(clean, result["inputs"])
+        render_plotly(
+            plot_profile_percentiles(profile_df),
+            key="prediction_profile_percentiles",
+        )
+        st.caption(
+            "Percentiles show the selected numerical values relative to the cleaned dataset for visual comparison only. "
+            "They are not additional model inputs or risk scores."
+        )
+
     st.warning(
         "This prediction tool demonstrates machine-learning classification for academic purposes and should not be treated as a medical diagnosis or medical recommendation."
     )
@@ -4875,25 +5515,34 @@ def render_prediction_page() -> None:
 # SIDEBAR / APP ROUTING
 # =============================================================================
 
+raw, clean, dataset_path = get_data()
+
+NAVIGATION_ITEMS = [
+    "🏠 Overview",
+    "⚙️ Data Preparation",
+    "🔍 Exploratory Analysis",
+    "🧪 Model Evaluation",
+    "🏆 Model Comparison",
+    "🔮 Prediction",
+]
+
 st.sidebar.markdown("## Obesity Analytics")
 st.sidebar.caption("BMDS2003 · Obesity Classification")
 
 page = st.sidebar.radio(
     "Navigation",
-    [
-        "🏠 Overview",
-        "⚙️ Data Preparation",
-        "🔍 Exploratory Analysis",
-        "🧪 Model Evaluation",
-        "🏆 Model Comparison",
-        "🔮 Prediction",
-    ],
+    NAVIGATION_ITEMS,
     label_visibility="collapsed",
 )
 
-st.sidebar.markdown("---")
+page_did_change = main_page_changed(page)
 
-raw, clean, dataset_path = get_data()
+render_sidebar_context(page, NAVIGATION_ITEMS)
+render_sidebar_snapshot(clean)
+render_sidebar_active_model(page)
+
+st.sidebar.markdown("---")
+render_sidebar_dataset_source()
 
 if page == "🏠 Overview":
     if raw is not None and clean is not None:
@@ -4909,7 +5558,11 @@ elif page == "🧪 Model Evaluation":
 elif page == "🏆 Model Comparison":
     render_model_comparison_page()
 elif page == "🔮 Prediction":
-    render_prediction_page()
+    render_prediction_page(clean)
+
+# Run only once per main-page change, after the new page has rendered.
+if page_did_change:
+    scroll_main_view_to_top()
 
 st.markdown("---")
 st.caption(
