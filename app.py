@@ -1672,6 +1672,41 @@ def inject_css() -> None:
         button[title="Exit fullscreen"] {
             z-index: 30 !important;
         }
+
+
+        /*
+        Fullscreen / browser-zoom safety.
+        Streamlit's fullscreen view is sensitive to transformed ancestors.
+        When a chart is expanded, force the main content back to a normal
+        containing block and allow the Plotly canvas/toolbar to use the
+        expanded viewport cleanly.
+        */
+        [data-testid="stMain"]:has(button[title="Exit fullscreen"]) .block-container {
+            transform: none !important;
+            animation: none !important;
+            overflow: visible !important;
+        }
+
+        [data-testid="stMain"]:has(button[title="Exit fullscreen"])
+        [data-testid="stPlotlyChart"],
+        [data-testid="stMain"]:has(button[title="Exit fullscreen"])
+        [data-testid="stPlotlyChart"] > div,
+        [data-testid="stMain"]:has(button[title="Exit fullscreen"])
+        [data-testid="stPlotlyChart"] .js-plotly-plot,
+        [data-testid="stMain"]:has(button[title="Exit fullscreen"])
+        [data-testid="stPlotlyChart"] .plot-container,
+        [data-testid="stMain"]:has(button[title="Exit fullscreen"])
+        [data-testid="stPlotlyChart"] .svg-container {
+            max-width: 100% !important;
+            overflow: visible !important;
+        }
+
+        [data-testid="stMain"]:has(button[title="Exit fullscreen"])
+        [data-testid="stPlotlyChart"] .modebar {
+            top: 10px !important;
+            right: 12px !important;
+            z-index: 999 !important;
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -2844,7 +2879,6 @@ def render_rank_card(
     gap: str,
     is_best: bool = False,
 ) -> None:
-    """Render one fixed-height ranking card so long model names never shift values."""
     best_class = " rank-card-best" if is_best else ""
     display_name = (
         "K-Nearest Neighbours<br>(KNN)"
@@ -2883,11 +2917,17 @@ def inject_page_change_transition() -> None:
         <style>
         @keyframes pageChangeEnter {
             from { opacity: 0.72; transform: translateY(5px); }
-            to { opacity: 1; transform: translateY(0); }
+            to { opacity: 1; transform: none; }
         }
 
         [data-testid="stMain"] .block-container {
-            animation: pageChangeEnter 210ms cubic-bezier(.22,.61,.36,1) both !important;
+            /*
+            Do not use animation-fill-mode: both/forwards here.
+            A persistent transform creates a containing block for fixed-position
+            fullscreen elements and can offset Streamlit's fullscreen overlay
+            when browser zoom changes.
+            */
+            animation: pageChangeEnter 210ms cubic-bezier(.22,.61,.36,1) !important;
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -3120,16 +3160,26 @@ def render_plotly(
     height: Optional[int] = None,
     key: Optional[str] = None,
 ) -> None:
-    """Render every interactive figure through one responsive configuration."""
+    """
+    Render every interactive figure through one responsive configuration.
+
+    The figure keeps its intended normal-page height, while the Streamlit
+    element itself is allowed to stretch when placed inside the fullscreen
+    viewport. This avoids the large empty region that becomes more obvious
+    when the browser is zoomed out (for example, 80%).
+    """
     resolved_height = int(height or fig.layout.height or 500)
+
+    # Keep the normal dashboard size supplied by each chart builder.
     fig.update_layout(
         height=resolved_height,
         autosize=True,
     )
+
     st.plotly_chart(
         fig,
         width="stretch",
-        height=resolved_height,
+        height="stretch",
         theme=None,
         config=PLOTLY_CONFIG,
         key=key,
