@@ -243,8 +243,9 @@ MODEL_REGISTRY = {
     },
 }
 
-# The accepted project results are used as a compatibility fingerprint only.
-# The UI never substitutes these values for live model calculations.
+# Final held-out evaluation values from Copy_of_dataScience.ipynb.
+# These are the analytical source of truth for presentation/evaluation.
+# Live trained models are used independently for interactive prediction.
 PROJECT_TEST_RESULTS = {
     "Logistic Regression": {
         "Accuracy": 0.9011,
@@ -314,6 +315,155 @@ CV_RESULTS = {
     },
 }
 
+
+# ROC summaries from Copy_of_dataScience.ipynb.
+# "Macro Curve" is the notebook's macro-average ROC curve AUC where reported;
+# "Macro OvR" is the macro one-vs-rest roc_auc_score result.
+NOTEBOOK_ROC_SUMMARY = {
+    "Logistic Regression": {
+        "Weighted OvR": 0.9865,
+        "Macro OvR": 0.9862,
+        "Micro": 0.9901,
+        "Macro Curve": 0.9866,
+        "Per Class": {
+            "Insufficient_Weight": 0.9996,
+            "Normal_Weight": 0.9843,
+            "Obesity_Type_I": 0.9901,
+            "Obesity_Type_II": 0.9973,
+            "Obesity_Type_III": 0.9991,
+            "Overweight_Level_I": 0.9703,
+            "Overweight_Level_II": 0.9626,
+        },
+    },
+    "K-Nearest Neighbours (KNN)": {
+        "Weighted OvR": 0.9706,
+        "Macro OvR": 0.9692,
+        "Micro": 0.9725,
+        "Macro Curve": 0.9692,
+        "Per Class": {
+            "Insufficient_Weight": 0.9780,
+            "Normal_Weight": 0.8901,
+            "Obesity_Type_I": 0.9893,
+            "Obesity_Type_II": 0.9943,
+            "Obesity_Type_III": 0.9991,
+            "Overweight_Level_I": 0.9519,
+            "Overweight_Level_II": 0.9812,
+        },
+    },
+    "Random Forest": {
+        "Weighted OvR": 0.9938,
+        "Macro OvR": 0.9936,
+        "Micro": 0.9957,
+        "Macro Curve": 0.9938,
+        "Per Class": {
+            "Insufficient_Weight": 0.9979,
+            "Normal_Weight": 0.9837,
+            "Obesity_Type_I": 0.9961,
+            "Obesity_Type_II": 0.9997,
+            "Obesity_Type_III": 1.0000,
+            "Overweight_Level_I": 0.9866,
+            "Overweight_Level_II": 0.9911,
+        },
+    },
+    "XGBoost": {
+        "Weighted OvR": 0.9985,
+        "Macro OvR": 0.9984,
+        "Micro": 0.9986,
+        "Macro Curve": 0.9978,
+        "Per Class": {
+            "Insufficient_Weight": 0.9978,
+            "Normal_Weight": 0.9962,
+            "Obesity_Type_I": 0.9984,
+            "Obesity_Type_II": 0.9999,
+            "Obesity_Type_III": 1.0000,
+            "Overweight_Level_I": 0.9972,
+            "Overweight_Level_II": 0.9994,
+        },
+    },
+}
+
+# Top feature-analysis values from Copy_of_dataScience.ipynb.
+# Logistic Regression values are mean absolute coefficient magnitudes.
+# KNN values are permutation importance (mean drop in accuracy).
+# Random Forest / XGBoost values are their notebook tree-based importance outputs.
+NOTEBOOK_FEATURE_IMPORTANCE = {
+    "Logistic Regression": [
+        ("Weight", 5.765739316958029),
+        ("Height", 1.582505020030543),
+        ("Gender_Male", 1.2975389110589532),
+        ("FAVC_yes", 0.7132044609237936),
+        ("family_history_with_overweight_yes", 0.6515601829437073),
+        ("FCVC", 0.5572826009562866),
+        ("CAEC_Sometimes", 0.5016264463030244),
+        ("CAEC_Frequently", 0.4859754952240652),
+        ("SMOKE_yes", 0.4643442279102284),
+        ("Age", 0.44118079764076107),
+        ("CALC_no", 0.3991721373047649),
+        ("CALC_Sometimes", 0.37835705323271135),
+        ("MTRANS_Public_Transportation", 0.36729626666584775),
+        ("CALC_Frequently", 0.33096307036345685),
+        ("MTRANS_Walking", 0.30749274774964414),
+    ],
+    "K-Nearest Neighbours (KNN)": [
+        ("Weight", 0.12073365231259965),
+        ("Height", 0.06307814992025515),
+        ("Age", 0.05813397129186602),
+        ("TUE", 0.05063795853269535),
+        ("FCVC", 0.04306220095693779),
+        ("NCP", 0.03883572567783091),
+        ("CH2O", 0.03213716108452947),
+        ("FAF", 0.029186602870813372),
+        ("MTRANS_Public_Transportation", 0.02001594896331736),
+        ("Gender_Male", 0.013476874003189771),
+        ("FAVC_yes", 0.011722488038277495),
+        ("SCC_yes", 0.009649122807017513),
+        ("CAEC_Sometimes", 0.007735247208931395),
+        ("CAEC_Frequently", 0.0033492822966506965),
+        ("CAEC_no", 0.0031897926634768536),
+    ],
+    "Random Forest": [
+        ("Weight", 0.315463),
+        ("Age", 0.094106),
+        ("FCVC", 0.089012),
+        ("Height", 0.086324),
+        ("Gender_Male", 0.055388),
+        ("NCP", 0.053642),
+        ("TUE", 0.046072),
+        ("CH2O", 0.045157),
+        ("FAF", 0.043225),
+        ("family_history_with_overweight_yes", 0.036687),
+        ("CALC_Sometimes", 0.024346),
+        ("CAEC_Sometimes", 0.020898),
+        ("CALC_no", 0.020705),
+        ("CAEC_Frequently", 0.020572),
+        ("MTRANS_Public_Transportation", 0.018020),
+    ],
+    "XGBoost": [
+        ("Gender_Male", 0.182625),
+        ("CAEC_no", 0.167012),
+        ("Weight", 0.091124),
+        ("CALC_no", 0.060105),
+        ("FCVC", 0.051884),
+        ("CAEC_Sometimes", 0.051121),
+        ("family_history_with_overweight_yes", 0.042180),
+        ("FAVC_yes", 0.041432),
+        ("CALC_Frequently", 0.040601),
+        ("NCP", 0.034918),
+        ("Height", 0.031981),
+        ("TUE", 0.028798),
+        ("CALC_Sometimes", 0.027496),
+        ("CAEC_Frequently", 0.026191),
+        ("MTRANS_Walking", 0.024570),
+    ],
+}
+
+MODEL_ACCENTS = {
+    "Logistic Regression": "#5E9ED6",
+    "K-Nearest Neighbours (KNN)": "#45B8B0",
+    "Random Forest": "#4FAE78",
+    "XGBoost": "#A56BE8",
+}
+
 PROJECT_TRAIN_ACCURACY = {
     "Logistic Regression": 0.8966,
     "K-Nearest Neighbours (KNN)": 1.0000,
@@ -339,7 +489,7 @@ MODEL_INFO = {
         "role": "Distance-based nonlinear model",
         "family": "Instance-based classifier",
         "configuration": (
-            "k = 3, Manhattan distance, distance weighting. The model pipeline applies StandardScaler to the eight numerical predictors."
+            "n_neighbors = 3, metric = 'manhattan', weights = 'distance'. The model pipeline applies StandardScaler to the eight numerical predictors."
         ),
         "strength": "Captures local neighbourhood structure without a linear-boundary assumption.",
         "limitation": "Distance-sensitive and prediction cost grows with training-set size.",
@@ -350,7 +500,7 @@ MODEL_INFO = {
         "role": "Nonlinear ensemble model",
         "family": "Bagged decision-tree ensemble",
         "configuration": (
-            "500 trees, max_depth = 12, min_samples_split = 5, min_samples_leaf = 2, "
+            "n_estimators = 500, max_depth = 12, min_samples_split = 5, min_samples_leaf = 2, "
             "class_weight = 'balanced'. Uses encoded unscaled predictors."
         ),
         "strength": "Captures nonlinear relationships/interactions and provides tree importance.",
@@ -1038,31 +1188,6 @@ def inject_css() -> None:
         /* =========================================================
            UNIFORM MODEL / RANK CARDS
            ========================================================= */
-
-        .kpi-card {
-            min-height: 160px !important;
-            height: 160px !important;
-            box-sizing: border-box;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .kpi-label {
-            min-height: 1.3rem;
-        }
-
-        .kpi-value {
-            min-height: 3.3rem;
-            display: flex;
-            align-items: center;
-            overflow-wrap: anywhere;
-        }
-
-        .kpi-note {
-            margin-top: auto !important;
-            min-height: 1.8rem;
-        }
-
         .rank-card {
             height: 184px;
             box-sizing: border-box;
@@ -1146,6 +1271,13 @@ def inject_css() -> None:
             letter-spacing: .01em;
             margin-bottom: 8px;
         }
+        .sidebar-context-line,
+        .sidebar-active-metric,
+        .sidebar-dataset-line {
+            color: #8E8E93;
+            font-size: .69rem;
+            line-height: 1.3;
+        }
 
         .sidebar-active-name {
             color: #1D1D1F;
@@ -1174,6 +1306,244 @@ def inject_css() -> None:
 
         .sidebar-dataset {
             padding: 3px 2px 0 2px;
+        }
+
+
+        /* =========================================================
+           FINAL POLISH — SCOPED COMPONENTS
+           ========================================================= */
+
+        /* General KPI cards return to the compact baseline design.
+           Long model names use dedicated classes below instead. */
+        .kpi-card {
+            min-height: 112px !important;
+            height: auto !important;
+            display: block !important;
+            padding: 16px 17px !important;
+        }
+
+        .kpi-label {
+            min-height: 0 !important;
+        }
+
+        .kpi-value {
+            min-height: 0 !important;
+            display: block !important;
+            overflow-wrap: normal !important;
+        }
+
+        .kpi-note {
+            margin-top: 6px !important;
+            min-height: 0 !important;
+        }
+
+        /* Only KPI cards whose value is a model name reserve extra wrapping room. */
+        .model-name-kpi-card .kpi-value {
+            min-height: 2.75rem !important;
+            display: flex !important;
+            align-items: center !important;
+            font-size: 1.30rem !important;
+            line-height: 1.18 !important;
+            overflow-wrap: anywhere !important;
+        }
+
+        /* Main-page animation is injected only on a true navigation change. */
+        .block-container {
+            animation: none !important;
+        }
+
+        /* Slightly tighter sidebar start without touching the collapse control. */
+        [data-testid="stSidebarUserContent"] {
+            padding-top: 0.65rem !important;
+        }
+
+        /* Compact Active Model card. */
+        .active-model-card {
+            padding: 10px 11px !important;
+        }
+
+        .active-model-card .sidebar-mini-title {
+            margin-bottom: 6px !important;
+        }
+
+        .active-model-card .sidebar-active-name {
+            margin: 1px 0 6px 0 !important;
+            line-height: 1.22 !important;
+        }
+
+        .sidebar-active-metrics {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            column-gap: 10px;
+            row-gap: 2px;
+            align-items: baseline;
+            margin-top: 2px;
+        }
+
+        .sidebar-active-metrics span,
+        .sidebar-active-metrics strong {
+            font-size: .80rem !important;
+            line-height: 1.15 !important;
+        }
+
+        .sidebar-active-metrics span {
+            color: #8E8E93;
+            font-weight: 500;
+        }
+
+        .sidebar-active-metrics strong {
+            color: #3A3A3C;
+            font-weight: 650;
+            text-align: right;
+        }
+
+        /* Model identity strip — model-specific accent is supplied inline. */
+        .model-identity-strip {
+            border: 1px solid var(--app-border);
+            border-left: 4px solid var(--model-accent);
+            background: var(--app-panel-soft);
+            border-radius: 12px;
+            padding: 12px 15px;
+            margin: 4px 0 14px 0;
+        }
+
+        .model-identity-name {
+            color: var(--app-text);
+            font-size: 1.05rem;
+            font-weight: 760;
+            line-height: 1.2;
+        }
+
+        .model-identity-subtitle {
+            color: var(--muted);
+            font-size: .82rem;
+            line-height: 1.3;
+            margin-top: 3px;
+        }
+
+        /* Compact model-overview cards. These are deliberately separate
+           from the generic .kpi-card component. */
+        .model-overview-card,
+        .cv-overview-card,
+        .model-summary-card,
+        .model-text-panel {
+            border: 1px solid var(--app-border);
+            background: var(--app-panel);
+            border-radius: 12px;
+            padding: 12px 13px;
+            box-shadow: var(--app-shadow);
+        }
+
+        .model-overview-label,
+        .cv-overview-label,
+        .model-summary-label,
+        .model-text-panel-title {
+            color: var(--muted);
+            font-size: .75rem;
+            font-weight: 650;
+            line-height: 1.2;
+            margin-bottom: 5px;
+        }
+
+        .model-overview-value,
+        .cv-overview-value {
+            color: var(--app-text);
+            font-size: 1.30rem;
+            font-weight: 760;
+            line-height: 1.08;
+        }
+
+        .model-overview-note,
+        .cv-overview-secondary,
+        .model-summary-note {
+            color: var(--muted);
+            font-size: .75rem;
+            line-height: 1.25;
+            margin-top: 5px;
+        }
+
+        .cv-overview-secondary {
+            font-size: .82rem;
+        }
+
+        .model-summary-value {
+            color: var(--app-text);
+            font-size: 1.06rem;
+            font-weight: 720;
+            line-height: 1.25;
+            white-space: normal;
+            overflow-wrap: anywhere;
+        }
+
+        .model-summary-card.confusion-pair .model-summary-value {
+            font-size: clamp(.95rem, 1.25vw, 1.14rem);
+            line-height: 1.22;
+            white-space: normal;
+            overflow: visible;
+            text-overflow: clip;
+        }
+
+        .model-text-panel {
+            box-shadow: none;
+            height: 100%;
+        }
+
+        .model-text-panel-body {
+            color: var(--muted);
+            font-size: .87rem;
+            line-height: 1.45;
+        }
+
+        /* Confusion summary uses its own cards so the long pair is never
+           truncated by Streamlit's metric component. */
+        .confusion-summary-card {
+            border: 1px solid var(--app-border);
+            background: var(--app-panel);
+            border-radius: 12px;
+            padding: 12px 13px;
+            min-height: 104px;
+            box-shadow: var(--app-shadow);
+        }
+
+        .confusion-summary-label {
+            color: var(--muted);
+            font-size: .75rem;
+            line-height: 1.2;
+            margin-bottom: 6px;
+        }
+
+        .confusion-summary-value {
+            color: var(--app-text);
+            font-size: 1.15rem;
+            font-weight: 730;
+            line-height: 1.22;
+            white-space: normal;
+            overflow-wrap: anywhere;
+        }
+
+        .confusion-summary-value.pair {
+            font-size: clamp(.95rem, 1.25vw, 1.14rem);
+            overflow: visible;
+            text-overflow: clip;
+        }
+
+        .confusion-summary-note {
+            color: var(--muted);
+            font-size: .74rem;
+            line-height: 1.25;
+            margin-top: 5px;
+        }
+
+        @media (max-width: 900px) {
+            .sidebar-active-metrics span,
+            .sidebar-active-metrics strong {
+                font-size: .77rem !important;
+            }
+
+            .model-overview-value,
+            .cv-overview-value {
+                font-size: 1.18rem;
+            }
         }
 
         /* Plot containers remain unconstrained so chart controls are not clipped. */
@@ -1793,7 +2163,36 @@ def inject_dark_mode() -> None:
             border-color: rgba(255,255,255,.08) !important;
             box-shadow: none !important;
         }
+        .sidebar-mini-title,
+        .sidebar-active-name {
+            color: #F5F5F7 !important;
+        }
 
+        .sidebar-context-line,
+        .sidebar-active-metric,
+        .sidebar-dataset-line {
+            color: #8E8E93 !important;
+        }
+
+
+        .sidebar-active-metrics span {
+            color: #8E8E93 !important;
+        }
+
+        .sidebar-active-metrics strong {
+            color: #F5F5F7 !important;
+        }
+
+        .model-identity-strip,
+        .model-overview-card,
+        .cv-overview-card,
+        .model-summary-card,
+        .model-text-panel,
+        .confusion-summary-card {
+            background: #2C2C2E !important;
+            border-color: rgba(255,255,255,.08) !important;
+            box-shadow: none !important;
+        }
 
         /* =========================================================
            DARK MODE TYPOGRAPHY COLOUR HIERARCHY
@@ -2290,18 +2689,20 @@ def render_hero(title: str, subtitle: str) -> None:
 
 
 def render_kpi_grid(
-    items: List[Tuple[str, str, str]],
+    items: List[Tuple],
     columns_per_row: int = 4,
 ) -> None:
+    """Render compact general KPI cards; optional fourth item is a scoped CSS class."""
     for start in range(0, len(items), columns_per_row):
         row = items[start : start + columns_per_row]
         cols = st.columns(columns_per_row)
         for col, item in zip(cols, row):
-            label, value, note = item
+            label, value, note = item[:3]
+            extra_class = f" {item[3]}" if len(item) > 3 and item[3] else ""
             with col:
                 st.markdown(
                     f"""
-                    <div class="kpi-card">
+                    <div class="kpi-card{extra_class}">
                         <div class="kpi-label">{label}</div>
                         <div class="kpi-value">{value}</div>
                         <div class="kpi-note">{note}</div>
@@ -2350,6 +2751,31 @@ def main_page_changed(current_page: str) -> bool:
     return False
 
 
+def inject_page_change_transition() -> None:
+    """Apply a restrained entrance animation on main-page navigation only."""
+    st.markdown(
+        """
+        <style>
+        @keyframes pageChangeEnter {
+            from { opacity: 0.72; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        [data-testid="stMain"] .block-container {
+            animation: pageChangeEnter 210ms cubic-bezier(.22,.61,.36,1) both !important;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            [data-testid="stMain"] .block-container {
+                animation: none !important;
+            }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def scroll_main_view_to_top() -> None:
     """Scroll the parent Streamlit page to the top after a main-page change only."""
     components.html(
@@ -2378,6 +2804,8 @@ def scroll_main_view_to_top() -> None:
         width=0,
     )
 
+
+
 def selected_sidebar_model(page: str) -> Optional[str]:
     if page == "🧪 Model Evaluation":
         return st.session_state.get("model_eval_selector", "Logistic Regression")
@@ -2391,17 +2819,19 @@ def render_sidebar_active_model(page: str) -> None:
     if model_name is None or model_name not in PROJECT_TEST_RESULTS:
         return
     metrics = PROJECT_TEST_RESULTS[model_name]
-    accent = MODEL_COLORS.get(model_name, "#0A84FF")
+    accent = MODEL_ACCENTS.get(model_name, "#0A84FF")
     st.sidebar.markdown(
         f"""
-        <div class="sidebar-mini-card">
+        <div class="sidebar-mini-card active-model-card">
             <div class="sidebar-mini-title">Active Model</div>
             <div class="sidebar-active-row">
                 <span class="sidebar-active-dot" style="background:{accent};"></span>
                 <div class="sidebar-active-name">{model_name}</div>
             </div>
-            <div class="sidebar-active-metric">Weighted F1&nbsp;&nbsp; {metrics['Weighted F1']:.4f}</div>
-            <div class="sidebar-active-metric">Accuracy&nbsp;&nbsp; {metrics['Accuracy']:.2%}</div>
+            <div class="sidebar-active-metrics">
+                <span>Weighted F1</span><strong>{metrics['Weighted F1']:.4f}</strong>
+                <span>Accuracy</span><strong>{metrics['Accuracy']:.2%}</strong>
+            </div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -3340,14 +3770,13 @@ def _metrics_match_project(model_name: str, metrics: Dict[str, float]) -> bool:
 @st.cache_resource(show_spinner=False)
 def load_evaluation_bundle(model_name: str) -> Tuple[Optional[Dict], Optional[str]]:
     """
-    Load the project's saved held-out evaluation bundle.
+    Load the held-out evaluation data used by the final project notebook.
 
-    Evaluation and live prediction are deliberately separated:
-    - evaluation uses the matching saved X_test / y_test / y_pred / y_proba set;
-    - prediction loads the trained classifier independently.
-
-    This prevents a model file from a different export generation from
-    disabling the presentation's saved evaluation results.
+    Saved class predictions are accepted only when their non-probability
+    metrics reproduce Copy_of_dataScience.ipynb. Displayed aggregate metrics
+    come from that notebook source of truth. Probability arrays are used for
+    interactive ROC curves only when their weighted OvR AUC also reproduces
+    the notebook result.
     """
     config = MODEL_REGISTRY[model_name]
     eval_cfg = config.get("evaluation", {})
@@ -3370,33 +3799,54 @@ def load_evaluation_bundle(model_name: str) -> Tuple[Optional[Dict], Optional[st
         if y_proba.ndim > 2:
             y_proba = np.squeeze(y_proba)
 
-        if len(y_true) != len(y_pred):
-            raise ValueError("Prediction length does not match the test labels.")
-        if y_proba.ndim != 2 or y_proba.shape[0] != len(y_true):
-            raise ValueError("Probability output does not match the test labels.")
-        if y_proba.shape[1] != len(XGB_CLASS_NAMES):
-            raise ValueError("Probability output must contain seven class columns.")
+        classes = XGB_CLASS_NAMES.copy()
+
+        if len(y_true) != 627 or len(y_pred) != len(y_true):
+            raise ValueError("Held-out prediction length does not match the final test set.")
+        if y_proba.ndim != 2 or y_proba.shape != (len(y_true), len(classes)):
+            raise ValueError("Probability output does not match the final seven-class test set.")
         if not np.allclose(y_proba.sum(axis=1), 1.0, rtol=1e-5, atol=1e-5):
             raise ValueError("Probability rows do not sum to one.")
-
-        # All four saved evaluation exports use the same seven-label ordering.
-        # This is also the LabelEncoder.classes_ order used for XGBoost.
-        classes = XGB_CLASS_NAMES.copy()
         if not set(np.unique(y_true)).issubset(set(classes)):
-            raise ValueError("Unknown class found in the held-out labels.")
+            raise ValueError("Unknown class found in held-out labels.")
         if not set(np.unique(y_pred)).issubset(set(classes)):
-            raise ValueError("Unknown class found in the saved predictions.")
+            raise ValueError("Unknown class found in saved predictions.")
 
-        metrics = calculate_evaluation_metrics(
+        reference = PROJECT_TEST_RESULTS[model_name]
+
+        observed = {
+            "Accuracy": float(accuracy_score(y_true, y_pred)),
+            "Precision": float(precision_score(y_true, y_pred, average="weighted", zero_division=0)),
+            "Recall": float(recall_score(y_true, y_pred, average="weighted", zero_division=0)),
+            "Weighted F1": float(f1_score(y_true, y_pred, average="weighted", zero_division=0)),
+            "Macro F1": float(f1_score(y_true, y_pred, average="macro", zero_division=0)),
+            "Errors": int(np.sum(y_true != y_pred)),
+        }
+
+        for key in ["Accuracy", "Precision", "Recall", "Weighted F1", "Macro F1"]:
+            if abs(observed[key] - float(reference[key])) > MODEL_METRIC_TOLERANCE:
+                raise ValueError("Saved class predictions do not reproduce the final notebook result.")
+        if observed["Errors"] != int(reference["Errors"]):
+            raise ValueError("Saved class predictions do not reproduce the final notebook error count.")
+
+        probability_auc = calculate_multiclass_roc_auc(
             y_true,
-            y_pred,
             y_proba,
             classes,
+            average="weighted",
+        )
+        roc_probability_verified = (
+            abs(probability_auc - float(reference["ROC-AUC"]))
+            <= MODEL_METRIC_TOLERANCE
         )
 
-        # A trained model is optional for evaluation-only views such as the
-        # confusion matrix and ROC curves. When available, attach it so the
-        # feature-analysis tab can still use model-specific information.
+        test_size = len(y_true)
+        metrics = {
+            **reference,
+            "Error Rate": float(reference["Errors"] / test_size),
+            "Test Size": test_size,
+        }
+
         model = None
         model_path = None
         try:
@@ -3405,6 +3855,7 @@ def load_evaluation_bundle(model_name: str) -> Tuple[Optional[Dict], Optional[st
             pass
 
         return {
+            "model_name": model_name,
             "model": model,
             "model_path": model_path,
             "X_test": X_test,
@@ -3413,6 +3864,8 @@ def load_evaluation_bundle(model_name: str) -> Tuple[Optional[Dict], Optional[st
             "y_proba": y_proba,
             "classes": classes,
             "metrics": metrics,
+            "probability_auc": probability_auc,
+            "roc_probability_verified": roc_probability_verified,
         }, None
 
     except Exception:
@@ -3571,6 +4024,8 @@ def compute_roc_details(artifact: Dict) -> Dict:
     y_true = artifact["y_true"]
     y_proba = artifact["y_proba"]
     classes = np.asarray(artifact["classes"]).astype(str)
+    model_name = artifact.get("model_name")
+    notebook_roc = NOTEBOOK_ROC_SUMMARY.get(model_name, {})
 
     fpr = {}
     tpr = {}
@@ -3594,18 +4049,18 @@ def compute_roc_details(artifact: Dict) -> Dict:
 
         fpr[cls] = cls_fpr
         tpr[cls] = cls_tpr
-        class_auc[cls] = float(auc(cls_fpr, cls_tpr))
+        class_auc[cls] = float(notebook_roc.get("Per Class", {}).get(cls, auc(cls_fpr, cls_tpr)))
 
     y_bin = label_binarize(y_true, classes=classes)
     fpr_micro, tpr_micro, _ = roc_curve(y_bin.ravel(), y_proba.ravel())
-    auc_micro = float(auc(fpr_micro, tpr_micro))
+    auc_micro = float(notebook_roc.get("Micro", auc(fpr_micro, tpr_micro)))
 
     all_fpr = np.unique(np.concatenate([fpr[c] for c in fpr]))
     mean_tpr = np.zeros_like(all_fpr)
     for cls in fpr:
         mean_tpr += np.interp(all_fpr, fpr[cls], tpr[cls])
     mean_tpr /= max(len(fpr), 1)
-    auc_macro_curve = float(auc(all_fpr, mean_tpr))
+    auc_macro_curve = float(notebook_roc.get("Macro Curve", auc(all_fpr, mean_tpr)))
 
     return {
         "fpr": fpr,
@@ -3749,115 +4204,100 @@ def plot_roc_averages(roc_details: Dict) -> go.Figure:
     fig.update_layout(margin=dict(l=24, r=24, t=68, b=105))
     return fig
 
+def plot_notebook_auc_summary(model_name: str) -> go.Figure:
+    """Interactive per-class ROC-AUC summary using final notebook values."""
+    summary = NOTEBOOK_ROC_SUMMARY[model_name]
+    chart = pd.DataFrame(
+        {
+            "Class": OBESITY_ORDER,
+            "Obesity Category": [display_label(c) for c in OBESITY_ORDER],
+            "AUC": [summary["Per Class"][c] for c in OBESITY_ORDER],
+        }
+    ).sort_values("AUC", ascending=True)
+
+    fig = go.Figure(
+        go.Bar(
+            x=chart["AUC"],
+            y=chart["Obesity Category"],
+            orientation="h",
+            marker_color=[OBESITY_COLORS[c] for c in chart["Class"]],
+            text=[f"{v:.4f}" for v in chart["AUC"]],
+            textposition="outside",
+            hovertemplate="%{y}<br>One-vs-Rest AUC: %{x:.4f}<extra></extra>",
+        )
+    )
+    fig.update_layout(
+        title=f"Per-class ROC-AUC — {model_name}",
+        xaxis_title="One-vs-Rest AUC",
+        yaxis_title="",
+        showlegend=False,
+    )
+    fig.update_xaxes(range=[0, 1])
+    return base_plot_layout(fig, 470)
+
+
+def render_roc_summary_from_notebook(model_name: str) -> None:
+    summary = NOTEBOOK_ROC_SUMMARY[model_name]
+    render_kpi_grid(
+        [
+            ("Weighted OvR ROC-AUC", f"{summary['Weighted OvR']:.4f}", "Support-weighted across classes"),
+            ("Macro OvR ROC-AUC", f"{summary['Macro OvR']:.4f}", "Equal weight to all classes"),
+            ("Micro-average AUC", f"{summary['Micro']:.4f}", "Pooled class decisions"),
+        ],
+        columns_per_row=3,
+    )
+    render_plotly(
+        plot_notebook_auc_summary(model_name),
+        key=f"roc_auc_summary_{model_name}",
+    )
+    auc_table = pd.DataFrame(
+        {
+            "Obesity Category": [display_label(c) for c in OBESITY_ORDER],
+            "Class AUC": [summary["Per Class"][c] for c in OBESITY_ORDER],
+        }
+    )
+    st.dataframe(
+        auc_table.style.format({"Class AUC": "{:.4f}"}),
+        width="stretch",
+        hide_index=True,
+    )
+
+
 def strip_transformer_prefix(name: str) -> str:
     return str(name).split("__", 1)[-1]
 
 
 def model_feature_analysis(model_name: str, artifact: Dict) -> Tuple[Optional[pd.DataFrame], str, str]:
-    model = artifact.get("model")
-    X_test = artifact["X_test"]
+    """Return final notebook feature-analysis values with model-appropriate wording."""
+    values = NOTEBOOK_FEATURE_IMPORTANCE.get(model_name)
+    if not values:
+        return None, "Feature analysis unavailable", "A supported feature-analysis view is not available for this model."
 
-    if model is None and model_name != "K-Nearest Neighbours (KNN)":
-        path = first_existing_path(MODEL_REGISTRY[model_name].get("feature_data_candidates", []))
-        if path is not None:
-            try:
-                df = pd.read_csv(path)
-                importance_col = next(
-                    (c for c in ["Importance", "Mean Importance", "Importance (mean drop in accuracy)"] if c in df.columns),
-                    None,
-                )
-                if "Feature" in df.columns and importance_col is not None:
-                    out = df[["Feature", importance_col]].copy()
-                    out.columns = ["Feature", "Importance"]
-                    return (
-                        out.sort_values("Importance", ascending=False).head(15),
-                        f"{model_name} feature analysis",
-                        "Feature values summarise the prepared model analysis for this classifier.",
-                    )
-            except Exception:
-                pass
-        return None, "Feature analysis unavailable", "Feature analysis is unavailable for this classifier."
+    out = pd.DataFrame(values, columns=["Feature", "Importance"])
 
+    if model_name == "Logistic Regression":
+        return (
+            out,
+            "Logistic Regression coefficient magnitude",
+            "Mean absolute model-coefficient magnitude across the multiclass coefficient vectors. Larger magnitude indicates stronger model contribution, not causality.",
+        )
     if model_name == "K-Nearest Neighbours (KNN)":
-        path = first_existing_path(MODEL_REGISTRY[model_name]["feature_data_candidates"])
-        if path is None:
-            return (
-                None,
-                "KNN has no intrinsic feature importance.",
-                "Permutation importance is the appropriate post-hoc feature view for KNN. The prepared ranking is not available in this presentation.",
-            )
-        df = pd.read_csv(path)
-        possible = [
-            "Importance (mean drop in accuracy)",
-            "Importance",
-            "Mean Importance",
-        ]
-        importance_col = next((c for c in possible if c in df.columns), None)
-        if "Feature" not in df.columns or importance_col is None:
-            return None, "Permutation importance unavailable", "The prepared KNN feature ranking could not be read."
-        out = df[["Feature", importance_col]].copy()
-        out.columns = ["Feature", "Importance"]
-        out = out.sort_values("Importance", ascending=False).head(15)
         return (
             out,
             "KNN permutation importance",
-            "Permutation importance measures the drop in predictive performance when a feature is shuffled; it is not built into KNN.",
+            "Permutation importance measures the mean drop in predictive accuracy when a feature is shuffled. KNN does not have intrinsic feature importance.",
         )
-
-    if model_name == "Logistic Regression":
-        estimator = model
-        feature_names = None
-        if hasattr(model, "named_steps"):
-            final_estimator = model.named_steps.get("logistic_regression")
-            if final_estimator is None:
-                final_estimator = list(model.named_steps.values())[-1]
-            estimator = final_estimator
-
-            preprocessor = model.named_steps.get("preprocessor")
-            if preprocessor is not None and hasattr(preprocessor, "get_feature_names_out"):
-                try:
-                    input_names = get_model_feature_names(model_name, model, X_test)
-                    feature_names = [
-                        strip_transformer_prefix(x)
-                        for x in preprocessor.get_feature_names_out(input_names)
-                    ]
-                except Exception:
-                    feature_names = None
-
-        if not hasattr(estimator, "coef_"):
-            return None, "Coefficient analysis unavailable", "The fitted Logistic Regression coefficients could not be accessed."
-
-        coefficients = np.asarray(estimator.coef_)
-        importance = np.mean(np.abs(coefficients), axis=0)
-        if feature_names is None:
-            feature_names = get_model_feature_names(model_name, model, X_test)
-        if len(feature_names) != len(importance):
-            return None, "Coefficient analysis unavailable", "Coefficient count does not match available feature names."
-
-        out = pd.DataFrame({"Feature": feature_names, "Importance": importance})
-        out = out.sort_values("Importance", ascending=False).head(15)
+    if model_name == "Random Forest":
         return (
             out,
-            "Logistic Regression mean absolute coefficient magnitude",
-            "Coefficient magnitude indicates how strongly a standardised model coefficient contributes across the seven one-vs-rest/multiclass coefficient vectors. It is not tree feature importance and does not imply causality.",
+            "Random Forest tree-based feature importance",
+            "Importance reflects contribution across the fitted forest and should be interpreted as model association rather than causal effect.",
         )
-
-    if hasattr(model, "feature_importances_"):
-        feature_names = get_model_feature_names(model_name, model, X_test)
-        values = np.asarray(model.feature_importances_)
-        if len(feature_names) != len(values):
-            return None, "Tree feature importance unavailable", "Importance count does not match feature names."
-        out = pd.DataFrame({"Feature": feature_names, "Importance": values})
-        out = out.sort_values("Importance", ascending=False).head(15)
-        if model_name == "XGBoost":
-            title = "XGBoost gain-based feature importance"
-            note = "The fitted XGBoost model uses tree-based importance_type = 'gain'. Importance is model association, not causal effect."
-        else:
-            title = "Random Forest tree-based feature importance"
-            note = "Random Forest importance reflects impurity reduction across fitted trees. Importance is model association, not causal effect."
-        return out, title, note
-
-    return None, "Feature analysis unavailable", "A supported feature-analysis view is not available for this model."
+    return (
+        out,
+        "XGBoost tree-based feature importance",
+        "Importance reflects the fitted boosted-tree model and should be interpreted as model association rather than causal effect.",
+    )
 
 
 def plot_feature_analysis(feature_df: pd.DataFrame, title: str) -> go.Figure:
@@ -4200,6 +4640,220 @@ def key_analytical_insights(df: pd.DataFrame) -> List[Dict[str, str]]:
             "Practical Relevance": "Dietary indicators can support richer risk classification when interpreted together with demographic and physical features.",
         },
     ]
+
+
+# =============================================================================
+# MODEL OVERVIEW PRESENTATION HELPERS
+# =============================================================================
+
+def render_model_identity_strip(model_name: str) -> None:
+    info = MODEL_INFO[model_name]
+    accent = MODEL_ACCENTS.get(model_name, "#0A84FF")
+    role_text = (
+        "Final recommended model"
+        if model_name == "XGBoost"
+        else info["role"]
+    )
+    st.markdown(
+        f"""
+        <div class="model-identity-strip" style="--model-accent:{accent};">
+            <div class="model-identity-name">{model_name}</div>
+            <div class="model-identity-subtitle">{info['family']} · {role_text}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_model_overview_card(label: str, value: str, note: str = "") -> None:
+    st.markdown(
+        f"""
+        <div class="model-overview-card">
+            <div class="model-overview-label">{label}</div>
+            <div class="model-overview-value">{value}</div>
+            <div class="model-overview-note">{note}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_cv_overview_card(label: str, value: str, secondary: str, note: str = "") -> None:
+    st.markdown(
+        f"""
+        <div class="cv-overview-card">
+            <div class="cv-overview-label">{label}</div>
+            <div class="cv-overview-value">{value}</div>
+            <div class="cv-overview-secondary">{secondary}</div>
+            <div class="model-overview-note">{note}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_model_summary_card(
+    label: str,
+    value: str,
+    note: str = "",
+    pair: bool = False,
+) -> None:
+    pair_class = " confusion-pair" if pair else ""
+    st.markdown(
+        f"""
+        <div class="model-summary-card{pair_class}">
+            <div class="model-summary-label">{label}</div>
+            <div class="model-summary-value">{value}</div>
+            <div class="model-summary-note">{note}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_confusion_summary_card(
+    label: str,
+    value: str,
+    note: str = "",
+    pair: bool = False,
+) -> None:
+    value_class = "confusion-summary-value pair" if pair else "confusion-summary-value"
+    st.markdown(
+        f"""
+        <div class="confusion-summary-card">
+            <div class="confusion-summary-label">{label}</div>
+            <div class="{value_class}">{value}</div>
+            <div class="confusion-summary-note">{note}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def plot_model_performance_profile(model_name: str, metrics: Dict[str, float]) -> go.Figure:
+    profile = pd.DataFrame(
+        {
+            "Metric": ["Accuracy", "Weighted F1", "Macro F1", "ROC-AUC"],
+            "Score": [
+                metrics["Accuracy"],
+                metrics["Weighted F1"],
+                metrics["Macro F1"],
+                metrics["ROC-AUC"],
+            ],
+        }
+    )
+    profile = profile.sort_values("Score", ascending=True)
+    accent = MODEL_ACCENTS.get(model_name, "#0A84FF")
+    fig = go.Figure(
+        go.Bar(
+            x=profile["Score"],
+            y=profile["Metric"],
+            orientation="h",
+            marker_color=accent,
+            text=[f"{value:.2%}" for value in profile["Score"]],
+            textposition="outside",
+            customdata=np.column_stack([[model_name] * len(profile)]),
+            hovertemplate="<b>%{customdata[0]}</b><br>%{y}: %{x:.2%}<extra></extra>",
+        )
+    )
+    fig.update_layout(
+        title="Performance Profile",
+        xaxis_title="Score",
+        yaxis_title="",
+        showlegend=False,
+    )
+    fig.update_xaxes(range=[0, 1], tickformat=".0%")
+    return base_plot_layout(fig, 300)
+
+
+def plot_model_generalisation(model_name: str, test_accuracy: float) -> go.Figure:
+    cv = CV_RESULTS[model_name]
+    cv_accuracy = cv["CV Accuracy"]
+    gap = abs(test_accuracy - cv_accuracy)
+    accent = MODEL_ACCENTS.get(model_name, "#0A84FF")
+
+    left = min(cv_accuracy, test_accuracy)
+    right = max(cv_accuracy, test_accuracy)
+
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=[left, right],
+            y=[model_name, model_name],
+            mode="lines",
+            line=dict(color="#8E8E93", width=4),
+            hoverinfo="skip",
+            showlegend=False,
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[cv_accuracy],
+            y=[model_name],
+            mode="markers+text",
+            name="CV Accuracy",
+            marker=dict(size=13, color=accent, symbol="circle"),
+            text=[f"CV {cv_accuracy:.2%}"],
+            textposition="top center",
+            hovertemplate=(
+                f"<b>{model_name}</b><br>"
+                f"CV Accuracy: {cv_accuracy:.2%}<br>"
+                f"Variation: ±{cv['CV Accuracy Variation']:.2%}"
+                "<extra></extra>"
+            ),
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[test_accuracy],
+            y=[model_name],
+            mode="markers+text",
+            name="Held-out Test Accuracy",
+            marker=dict(size=13, color="#6B7F93", symbol="diamond"),
+            text=[f"Test {test_accuracy:.2%}"],
+            textposition="bottom center",
+            hovertemplate=(
+                f"<b>{model_name}</b><br>"
+                f"Held-out Test Accuracy: {test_accuracy:.2%}<br>"
+                f"Absolute gap: {gap:.2%}"
+                "<extra></extra>"
+            ),
+        )
+    )
+    fig.update_layout(
+        title="CV Accuracy vs Held-out Test Accuracy",
+        xaxis_title="Accuracy",
+        yaxis_title="",
+        showlegend=False,
+    )
+    fig.update_xaxes(range=[0, 1], tickformat=".0%")
+    fig.update_yaxes(showticklabels=False)
+    return base_plot_layout(fig, 245)
+
+
+def render_strength_limitation_panels(model_name: str) -> None:
+    info = MODEL_INFO[model_name]
+    left, right = st.columns(2)
+    with left:
+        st.markdown(
+            f"""
+            <div class="model-text-panel">
+                <div class="model-text-panel-title">Strength</div>
+                <div class="model-text-panel-body">{info['strength']}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with right:
+        st.markdown(
+            f"""
+            <div class="model-text-panel">
+                <div class="model-text-panel-title">Limitation</div>
+                <div class="model-text-panel-body">{info['limitation']}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
 
 # =============================================================================
@@ -4660,73 +5314,152 @@ def render_model_evaluation_page() -> None:
         return
 
     metrics = bundle["metrics"]
-    render_kpi_grid(
-        [
-            ("Accuracy", fmt_pct(metrics["Accuracy"]), "Held-out test set"),
-            ("Weighted Precision", f"{metrics['Precision']:.4f}", "Support-weighted across classes"),
-            ("Weighted Recall", f"{metrics['Recall']:.4f}", "Support-weighted across classes"),
-            ("Weighted F1", f"{metrics['Weighted F1']:.4f}", "Primary balanced comparison metric"),
-            ("Macro F1", f"{metrics['Macro F1']:.4f}", "Equal weight to all seven classes"),
-            ("Weighted OvR ROC-AUC", f"{metrics['ROC-AUC']:.4f}", "Probability discrimination"),
-        ],
-        columns_per_row=3,
+    cv = CV_RESULTS[model_name]
+    details = confusion_details(bundle)
+    class_df = class_performance_dataframe(bundle)
+    strongest = class_df.loc[class_df["F1"].idxmax()]
+    weakest = class_df.loc[class_df["F1"].idxmin()]
+    pair = details["pair"]
+    pair_value = (
+        f"{display_label(pair[0])} ↔ {display_label(pair[1])}"
+        if pair else "Unavailable"
     )
 
     tabs = st.tabs(["Overview", "Confusion Matrix", "Class Performance", "ROC", "Feature Analysis"])
 
     with tabs[0]:
-        info = MODEL_INFO[model_name]
-        left, right = st.columns([0.6, 0.4])
-        with left:
-            st.markdown(f"### {model_name}")
-            st.markdown(f"**Role:** {info['role']}")
-            st.markdown(f"**Model family:** {info['family']}")
-            st.markdown(f"**Configuration:** {info['configuration']}")
-            st.markdown(f"**Strength:** {info['strength']}")
-            st.markdown(f"**Limitation:** {info['limitation']}")
-        with right:
-            st.metric("Misclassified test cases", f"{metrics['Errors']} / {metrics['Test Size']}")
-            st.metric("Error rate", fmt_pct(metrics["Error Rate"]))
-            cv = CV_RESULTS[model_name]
-            st.metric(
+        render_model_identity_strip(model_name)
+
+        st.markdown("#### Performance")
+        perf_cols = st.columns(5)
+        performance_items = [
+            ("Accuracy", f"{metrics['Accuracy']:.2%}", "Held-out test"),
+            ("Weighted F1", f"{metrics['Weighted F1']:.4f}", "Support-weighted"),
+            ("Macro F1", f"{metrics['Macro F1']:.4f}", "Equal class weight"),
+            ("Weighted OvR ROC-AUC", f"{metrics['ROC-AUC']:.4f}", "Probability discrimination"),
+            ("Errors", f"{int(metrics['Errors'])}", f"{metrics['Error Rate']:.2%} of {int(metrics['Test Size'])}"),
+        ]
+        for col, (label, value, note) in zip(perf_cols, performance_items):
+            with col:
+                render_model_overview_card(label, value, note)
+
+        st.markdown("#### Validation & generalisation")
+        gap = abs(metrics["Accuracy"] - cv["CV Accuracy"])
+        val_cols = st.columns(4)
+        with val_cols[0]:
+            render_cv_overview_card(
                 "CV Accuracy",
                 f"{cv['CV Accuracy']:.2%}",
                 f"± {cv['CV Accuracy Variation']:.2%}",
-                delta_color="off",
+                "Five-fold validation",
             )
-            st.metric(
+        with val_cols[1]:
+            render_cv_overview_card(
                 "CV Weighted F1",
                 f"{cv['CV F1']:.2%}",
                 f"± {cv['CV F1 Variation']:.2%}",
-                delta_color="off",
+                "Five-fold validation",
             )
-            st.caption(
-                "Five-fold cross-validation evaluates how consistently the model performs across "
-                "different training subsets, helping assess stability and generalisation beyond a single train–test split."
+        with val_cols[2]:
+            render_model_overview_card(
+                "CV ↔ Test Gap",
+                f"{gap * 100:.2f} pp",
+                "Absolute accuracy difference",
+            )
+        with val_cols[3]:
+            render_model_overview_card(
+                "Test Sample",
+                f"{int(metrics['Test Size'])}",
+                "Held-out observations",
             )
 
+        chart_left, chart_right = st.columns([0.58, 0.42])
+        with chart_left:
+            render_plotly(
+                plot_model_performance_profile(model_name, metrics),
+                key=f"overview_profile_{model_name}",
+            )
+        with chart_right:
+            render_plotly(
+                plot_model_generalisation(model_name, metrics["Accuracy"]),
+                key=f"overview_generalisation_{model_name}",
+            )
+
+        render_strength_limitation_panels(model_name)
+
+        st.markdown("#### Class-level summary")
+        summary_cols = st.columns(3)
+        with summary_cols[0]:
+            render_model_summary_card(
+                "Strongest Class",
+                strongest["Obesity Category"],
+                f"F1 = {strongest['F1']:.4f}",
+            )
+        with summary_cols[1]:
+            render_model_summary_card(
+                "Weakest Class",
+                weakest["Obesity Category"],
+                f"F1 = {weakest['F1']:.4f}",
+            )
+        with summary_cols[2]:
+            render_model_summary_card(
+                "Most Frequent Confusion Pair",
+                pair_value,
+                f"{details['pair_count']} combined errors",
+                pair=True,
+            )
+
+        with st.expander("Model configuration"):
+            st.markdown(f"**Model family:** {MODEL_INFO[model_name]['family']}")
+            st.markdown(f"**Configuration:** {MODEL_INFO[model_name]['configuration']}")
+
     with tabs[1]:
-        mode = st.radio("View mode", ["Count", "Percentage"], horizontal=True, key=f"cm_mode_{model_name}")
-        render_plotly(plot_confusion_matrix(bundle, mode), key=f"cm_{model_name}_{mode}")
-        details = confusion_details(bundle)
-        pair = details["pair"]
-        pair_text = (
-            f"{display_label(pair[0])} ↔ {display_label(pair[1])} ({details['pair_count']} combined errors)"
-            if pair else "Unavailable"
+        mode = st.radio(
+            "View mode",
+            ["Count", "Percentage"],
+            horizontal=True,
+            key=f"cm_mode_{model_name}",
         )
+        render_plotly(
+            plot_confusion_matrix(bundle, mode),
+            key=f"cm_{model_name}_{mode}",
+        )
+
         c1, c2, c3 = st.columns(3)
-        c1.metric("Best-classified category", display_label(details["best_class"]), f"Recall {details['best_recall']:.1%}")
-        c2.metric("Hardest category", display_label(details["hardest_class"]), f"Recall {details['hardest_recall']:.1%}")
-        c3.metric("Most frequent confusion pair", pair_text)
+        with c1:
+            render_confusion_summary_card(
+                "Best-classified category",
+                display_label(details["best_class"]),
+                f"Recall {details['best_recall']:.1%}",
+            )
+        with c2:
+            render_confusion_summary_card(
+                "Hardest category",
+                display_label(details["hardest_class"]),
+                f"Recall {details['hardest_recall']:.1%}",
+            )
+        with c3:
+            render_confusion_summary_card(
+                "Most frequent confusion pair",
+                pair_value,
+                f"{details['pair_count']} combined errors",
+                pair=True,
+            )
+
         adjacency = "neighbouring" if details["pair_adjacent"] else "non-neighbouring"
         render_insight(
             "Misclassification interpretation",
-            f"The most frequent two-way confusion pair is {pair_text}. These are {adjacency} categories in the natural obesity progression. Concentration of errors among adjacent classes is analytically plausible because boundary categories overlap more than extreme categories in the feature space."
+            f"The most frequent two-way confusion pair is {pair_value} "
+            f"({details['pair_count']} combined errors). These are {adjacency} categories in the "
+            "natural obesity progression. Errors concentrated around neighbouring categories are "
+            "consistent with overlapping boundary cases in the feature space."
         )
 
     with tabs[2]:
-        class_df = class_performance_dataframe(bundle)
-        render_plotly(plot_class_performance(class_df), key=f"class_perf_{model_name}")
+        render_plotly(
+            plot_class_performance(class_df),
+            key=f"class_perf_{model_name}",
+        )
         st.dataframe(
             class_df[["Obesity Category", "Precision", "Recall", "F1", "Support"]].style.format(
                 {"Precision": "{:.3f}", "Recall": "{:.3f}", "F1": "{:.3f}"}
@@ -4734,36 +5467,48 @@ def render_model_evaluation_page() -> None:
             width="stretch",
             hide_index=True,
         )
-        strongest = class_df.loc[class_df["F1"].idxmax()]
-        weakest = class_df.loc[class_df["F1"].idxmin()]
         render_insight(
             "Class-level performance",
-            f"The strongest class by F1 is {strongest['Obesity Category']} ({strongest['F1']:.3f}); the weakest is {weakest['Obesity Category']} ({weakest['F1']:.3f}). This shows why a single aggregate accuracy value is not sufficient for evaluating a seven-class model."
+            f"The strongest class by F1 is {strongest['Obesity Category']} "
+            f"({strongest['F1']:.3f}); the weakest is {weakest['Obesity Category']} "
+            f"({weakest['F1']:.3f}). This shows why a single aggregate accuracy value is not "
+            "sufficient for evaluating a seven-class model."
         )
 
     with tabs[3]:
-        try:
-            roc_details = compute_roc_details(bundle)
-            roc_tab1, roc_tab2 = st.tabs(["Per-class ROC", "Micro / Macro ROC"])
-            with roc_tab1:
-                render_plotly(plot_roc_classes(roc_details), key=f"roc_class_{model_name}")
-                auc_table = pd.DataFrame(
-                    {
-                        "Obesity Category": [display_label(c) for c in OBESITY_ORDER],
-                        "Class AUC": [roc_details["class_auc"].get(c, np.nan) for c in OBESITY_ORDER],
-                    }
-                )
-                st.dataframe(
-                    auc_table.style.format({"Class AUC": "{:.4f}"}),
-                    width="stretch",
-                    hide_index=True,
-                )
-                st.caption("Each coloured curve is a one-vs-rest class ROC curve; its AUC is shown directly in the legend.")
-            with roc_tab2:
-                render_plotly(plot_roc_averages(roc_details), key=f"roc_avg_{model_name}")
-                st.caption("Micro-average pools all class decisions, while macro-average gives each class equal weight. The dashed diagonal is the random baseline.")
-        except Exception:
-            st.warning("ROC analysis is unavailable for this model.")
+        if bundle.get("roc_probability_verified", False):
+            try:
+                roc_details = compute_roc_details(bundle)
+                roc_tab1, roc_tab2 = st.tabs(["Per-class ROC", "Micro / Macro ROC"])
+                with roc_tab1:
+                    render_plotly(
+                        plot_roc_classes(roc_details),
+                        key=f"roc_class_{model_name}",
+                    )
+                    source_roc = NOTEBOOK_ROC_SUMMARY[model_name]
+                    auc_table = pd.DataFrame(
+                        {
+                            "Obesity Category": [display_label(c) for c in OBESITY_ORDER],
+                            "Class AUC": [source_roc["Per Class"][c] for c in OBESITY_ORDER],
+                        }
+                    )
+                    st.dataframe(
+                        auc_table.style.format({"Class AUC": "{:.4f}"}),
+                        width="stretch",
+                        hide_index=True,
+                    )
+                    st.caption(
+                        "Each coloured curve is a one-vs-rest class ROC curve; its AUC is shown directly in the legend."
+                    )
+                with roc_tab2:
+                    render_plotly(
+                        plot_roc_averages(roc_details),
+                        key=f"roc_avg_{model_name}",
+                    )
+            except Exception:
+                render_roc_summary_from_notebook(model_name)
+        else:
+            render_roc_summary_from_notebook(model_name)
 
     with tabs[4]:
         feature_df, title, note = model_feature_analysis(model_name, bundle)
@@ -4772,12 +5517,16 @@ def render_model_evaluation_page() -> None:
         if feature_df is None:
             st.info("No supported feature-analysis view is available for this model.")
         else:
-            render_plotly(plot_feature_analysis(feature_df, title), key=f"feature_{model_name}")
+            render_plotly(
+                plot_feature_analysis(feature_df, title),
+                key=f"feature_{model_name}",
+            )
             st.dataframe(
                 feature_df.style.format({"Importance": "{:.5f}"}),
                 width="stretch",
                 hide_index=True,
             )
+
 
 def render_model_comparison_page() -> None:
     render_hero(
@@ -5031,11 +5780,6 @@ def render_model_comparison_page() -> None:
     st.info("ROC-AUC is intentionally not placed on this grouped bar axis; it answers a different discrimination question and is retained in the ranking table and model-evaluation ROC view.")
 
     st.markdown("### Cross-validation stability vs held-out test performance")
-    st.caption(
-        "Five-fold cross-validation evaluates how consistently each model performs across different "
-        "training subsets, helping assess model stability and generalisation beyond a single train–test split."
-    )
-
     # Model name is the authoritative key. Sorting/ranking never determines CV assignment.
     comparison_by_model = comparison.set_index("Model")
     cv_model_order = [name for name in MODEL_REGISTRY if name in comparison_by_model.index]
@@ -5341,7 +6085,7 @@ def render_prediction_page(clean: Optional[pd.DataFrame] = None) -> None:
             ("Predicted Obesity Level", display_label(result["prediction"]), "Highest predicted probability"),
             ("Prediction Confidence", fmt_pct(result["confidence"]), "Maximum class probability"),
             ("BMI (Reference)", f"{result['BMI']:.2f}", "Not an input feature added by this app"),
-            ("Selected Model", result["model"], "Trained classifier"),
+            ("Selected Model", result["model"], "Trained classifier", "model-name-kpi-card"),
         ]
     )
 
@@ -5459,6 +6203,9 @@ page = st.sidebar.radio(
 )
 
 page_did_change = main_page_changed(page)
+
+if page_did_change:
+    inject_page_change_transition()
 
 render_sidebar_context(page, NAVIGATION_ITEMS)
 render_sidebar_active_model(page)
