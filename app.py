@@ -1305,7 +1305,7 @@ def inject_css() -> None:
         }
 
         .sidebar-dataset {
-            padding: 3px 2px 0 2px;
+            padding: 3px 1px 0 2px;
         }
 
 
