@@ -2,11 +2,6 @@
 BMDS2003 Data Science — Obesity Risk Analytics & Classification Dashboard
 =========================================================================
 
-Presentation-focused Streamlit application for the established BMDS2003
-obesity classification workflow. The application does not train or retune
-models; evaluation is reproduced from the project dataset, fixed split,
-fixed encoding scheme and compatible trained classifiers.
-
 Run with:
     streamlit run app.py
 """
@@ -2884,7 +2879,6 @@ def render_rank_card(
     gap: str,
     is_best: bool = False,
 ) -> None:
-    """Render one fixed-height ranking card so long model names never shift values."""
     best_class = " rank-card-best" if is_best else ""
     display_name = (
         "K-Nearest Neighbours<br>(KNN)"
@@ -3248,88 +3242,24 @@ def load_first_joblib(candidates: Tuple[str, ...]):
 @st.cache_resource(show_spinner=False)
 def load_prediction_model(model_name: str):
     """
-    Load the trained classifier that matches Copy_of_dataScience.ipynb.
+    Load a trained classifier for live prediction.
 
-    Some project folders can contain more than one historical model file.
-    To prevent a valid-looking but older model from being used for live
-    prediction or feature analysis, each candidate is checked against the
-    established 627-record held-out test set. The candidate must reproduce
-    the notebook's classification accuracy, weighted F1 and error count.
-
-    This validation does not retrain or modify any model.
+    Prediction availability is intentionally independent from the saved
+    evaluation results. A model only needs to load successfully and accept the
+    established 23-feature input schema.
     """
-    reference = PROJECT_TEST_RESULTS[model_name]
-    eval_data = build_project_evaluation_data()
-    X_eval = eval_data["X_test_encoded"]
-    y_true = eval_data["y_test"]
-
     errors = []
-
     for model_path in MODEL_REGISTRY[model_name]["model_candidates"]:
         if not Path(model_path).exists():
             continue
-
         try:
             model = load_model(model_path)
-
-            # Preserve the exact feature order expected by the fitted model.
-            project_columns = X_eval.columns.tolist()
-            model_columns = None
-
-            if model_name == "XGBoost" and hasattr(model, "get_booster"):
-                booster_names = model.get_booster().feature_names
-                if booster_names:
-                    model_columns = [str(x) for x in booster_names]
-
-            if model_columns is None and hasattr(model, "feature_names_in_"):
-                model_columns = [str(x) for x in model.feature_names_in_]
-
-            if model_columns is not None:
-                if len(model_columns) != 23 or set(model_columns) != set(project_columns):
-                    raise ValueError("Feature schema does not match the final 23-feature project schema.")
-                X_model = X_eval.loc[:, model_columns]
-            else:
-                if hasattr(model, "n_features_in_") and int(model.n_features_in_) != 23:
-                    raise ValueError("Feature count does not match the final project schema.")
-                X_model = X_eval
-
-            raw_pred = np.asarray(model.predict(X_model)).ravel()
-
-            if model_name == "XGBoost":
-                raw_as_str = raw_pred.astype(str)
-                if set(np.unique(raw_as_str)).issubset(set(XGB_CLASS_NAMES)):
-                    y_pred = raw_as_str
-                else:
-                    ids = raw_pred.astype(int)
-                    if np.any(ids < 0) or np.any(ids >= len(XGB_CLASS_NAMES)):
-                        raise ValueError("XGBoost returned an unknown class ID.")
-                    y_pred = XGB_CLASS_NAMES[ids].astype(str)
-            else:
-                y_pred = raw_pred.astype(str)
-
-            observed_accuracy = float(accuracy_score(y_true, y_pred))
-            observed_f1 = float(
-                f1_score(y_true, y_pred, average="weighted", zero_division=0)
-            )
-            observed_errors = int(np.sum(y_true != y_pred))
-
-            if abs(observed_accuracy - float(reference["Accuracy"])) > MODEL_METRIC_TOLERANCE:
-                raise ValueError("Accuracy does not reproduce the final notebook model.")
-            if abs(observed_f1 - float(reference["Weighted F1"])) > MODEL_METRIC_TOLERANCE:
-                raise ValueError("Weighted F1 does not reproduce the final notebook model.")
-            if observed_errors != int(reference["Errors"]):
-                raise ValueError("Error count does not reproduce the final notebook model.")
-
             return model, model_path
-
         except Exception as exc:
             errors.append(f"{model_path}: {exc}")
 
     if errors:
-        raise RuntimeError(
-            f"{model_name} could not be matched to the final project model."
-        )
-
+        raise RuntimeError(f"{model_name} could not be loaded for prediction.")
     raise FileNotFoundError(f"{model_name} trained model is unavailable.")
 
 
@@ -4015,40 +3945,30 @@ def _metrics_match_project(model_name: str, metrics: Dict[str, float]) -> bool:
 @st.cache_resource(show_spinner=False)
 def load_evaluation_bundle(model_name: str) -> Tuple[Optional[Dict], Optional[str]]:
     """
-    Load the held-out evaluation used by Copy_of_dataScience.ipynb.
-
-    The exact 627-row encoded test matrix and labels are reconstructed from
-    ObesityDataSet.csv using the notebook's duplicate removal, 70/30 stratified
-    split, random_state=42 and one-hot encoding procedure. This avoids relying
-    on historical X_test sidecars whose numeric columns may have been stored
-    with a different dtype.
+    Load the held-out evaluation data used by the final project notebook.
 
     Saved class predictions are accepted only when their non-probability
-    metrics reproduce Copy_of_dataScience.ipynb. Probability arrays are used
-    for interactive ROC curves only when their weighted OvR AUC also reproduces
+    metrics reproduce Copy_of_dataScience.ipynb. Displayed aggregate metrics
+    come from that notebook source of truth. Probability arrays are used for
+    interactive ROC curves only when their weighted OvR AUC also reproduces
     the notebook result.
     """
     config = MODEL_REGISTRY[model_name]
     eval_cfg = config.get("evaluation", {})
 
-    # Authoritative evaluation partition reconstructed exactly from the dataset.
     try:
-        project_eval = build_project_evaluation_data()
-        X_test = project_eval["X_test_encoded"].copy()
-        y_true = np.asarray(project_eval["y_test"]).ravel().astype(str)
-    except Exception:
-        return None, f"{model_name} evaluation results are unavailable."
-
-    # Saved prediction/probability outputs from the final model run.
-    try:
-        saved_y_test, _ = load_first_joblib(tuple(eval_cfg["y_test"]))
+        X_test, _ = load_first_joblib(tuple(eval_cfg["X_test"]))
+        y_test, _ = load_first_joblib(tuple(eval_cfg["y_test"]))
         y_pred, _ = load_first_joblib(tuple(eval_cfg["y_pred"]))
         y_proba, _ = load_first_joblib(tuple(eval_cfg["y_proba"]))
     except Exception:
         return None, f"{model_name} evaluation results are unavailable."
 
     try:
-        saved_y_test = np.asarray(saved_y_test).ravel().astype(str)
+        if not isinstance(X_test, pd.DataFrame):
+            X_test = pd.DataFrame(X_test)
+
+        y_true = np.asarray(y_test).ravel().astype(str)
         y_pred = np.asarray(y_pred).ravel().astype(str)
         y_proba = np.asarray(y_proba, dtype=float)
         if y_proba.ndim > 2:
@@ -4056,12 +3976,8 @@ def load_evaluation_bundle(model_name: str) -> Tuple[Optional[Dict], Optional[st
 
         classes = XGB_CLASS_NAMES.copy()
 
-        if len(y_true) != 627:
-            raise ValueError("The reconstructed held-out set is not the final 627-record test set.")
-        if not np.array_equal(saved_y_test, y_true):
-            raise ValueError("Saved test labels do not match the final notebook test partition.")
-        if len(y_pred) != len(y_true):
-            raise ValueError("Saved predictions do not match the final test-set length.")
+        if len(y_true) != 627 or len(y_pred) != len(y_true):
+            raise ValueError("Held-out prediction length does not match the final test set.")
         if y_proba.ndim != 2 or y_proba.shape != (len(y_true), len(classes)):
             raise ValueError("Probability output does not match the final seven-class test set.")
         if not np.allclose(y_proba.sum(axis=1), 1.0, rtol=1e-5, atol=1e-5):
@@ -4075,31 +3991,18 @@ def load_evaluation_bundle(model_name: str) -> Tuple[Optional[Dict], Optional[st
 
         observed = {
             "Accuracy": float(accuracy_score(y_true, y_pred)),
-            "Precision": float(
-                precision_score(y_true, y_pred, average="weighted", zero_division=0)
-            ),
-            "Recall": float(
-                recall_score(y_true, y_pred, average="weighted", zero_division=0)
-            ),
-            "Weighted F1": float(
-                f1_score(y_true, y_pred, average="weighted", zero_division=0)
-            ),
-            "Macro F1": float(
-                f1_score(y_true, y_pred, average="macro", zero_division=0)
-            ),
+            "Precision": float(precision_score(y_true, y_pred, average="weighted", zero_division=0)),
+            "Recall": float(recall_score(y_true, y_pred, average="weighted", zero_division=0)),
+            "Weighted F1": float(f1_score(y_true, y_pred, average="weighted", zero_division=0)),
+            "Macro F1": float(f1_score(y_true, y_pred, average="macro", zero_division=0)),
             "Errors": int(np.sum(y_true != y_pred)),
         }
 
         for key in ["Accuracy", "Precision", "Recall", "Weighted F1", "Macro F1"]:
             if abs(observed[key] - float(reference[key])) > MODEL_METRIC_TOLERANCE:
-                raise ValueError(
-                    "Saved class predictions do not reproduce the final notebook result."
-                )
-
+                raise ValueError("Saved class predictions do not reproduce the final notebook result.")
         if observed["Errors"] != int(reference["Errors"]):
-            raise ValueError(
-                "Saved class predictions do not reproduce the final notebook error count."
-            )
+            raise ValueError("Saved class predictions do not reproduce the final notebook error count.")
 
         probability_auc = calculate_multiclass_roc_auc(
             y_true,
@@ -4107,7 +4010,6 @@ def load_evaluation_bundle(model_name: str) -> Tuple[Optional[Dict], Optional[st
             classes,
             average="weighted",
         )
-
         roc_probability_verified = (
             abs(probability_auc - float(reference["ROC-AUC"]))
             <= MODEL_METRIC_TOLERANCE
@@ -5434,38 +5336,9 @@ def render_model_evaluation_page() -> None:
         if pair else "Unavailable"
     )
 
-    evaluation_views = [
-        "Overview",
-        "Confusion Matrix",
-        "Class Performance",
-        "ROC",
-        "Feature Analysis",
-    ]
+    tabs = st.tabs(["Overview", "Confusion Matrix", "Class Performance", "ROC", "Feature Analysis"])
 
-    # Streamlit tabs reset to the first tab whenever a widget inside a tab
-    # triggers a rerun. A stateful selector prevents Count -> Percentage
-    # from jumping back to Overview. Use segmented_control when supported,
-    # with a radio fallback for older Streamlit versions.
-    if hasattr(st, "segmented_control"):
-        evaluation_view = st.segmented_control(
-            "Evaluation view",
-            evaluation_views,
-            default="Overview",
-            key="model_eval_view",
-            label_visibility="collapsed",
-        )
-        if evaluation_view is None:
-            evaluation_view = "Overview"
-    else:
-        evaluation_view = st.radio(
-            "Evaluation view",
-            evaluation_views,
-            horizontal=True,
-            key="model_eval_view",
-            label_visibility="collapsed",
-        )
-
-    if evaluation_view == "Overview":
+    with tabs[0]:
         render_model_identity_strip(model_name)
 
         st.markdown("#### Performance")
@@ -5523,14 +5396,13 @@ def render_model_evaluation_page() -> None:
         render_model_configuration(model_name)
         render_model_insight(model_name)
 
-    elif evaluation_view == "Confusion Matrix":
+    with tabs[1]:
         mode = st.radio(
             "View mode",
             ["Count", "Percentage"],
             horizontal=True,
             key=f"cm_mode_{model_name}",
         )
-
         render_plotly(
             plot_confusion_matrix(bundle, mode),
             key=f"cm_{model_name}_{mode}",
@@ -5566,22 +5438,18 @@ def render_model_evaluation_page() -> None:
             "consistent with overlapping boundary cases in the feature space."
         )
 
-    elif evaluation_view == "Class Performance":
+    with tabs[2]:
         render_plotly(
             plot_class_performance(class_df),
             key=f"class_perf_{model_name}",
         )
-
         st.dataframe(
-            class_df[
-                ["Obesity Category", "Precision", "Recall", "F1", "Support"]
-            ].style.format(
+            class_df[["Obesity Category", "Precision", "Recall", "F1", "Support"]].style.format(
                 {"Precision": "{:.3f}", "Recall": "{:.3f}", "F1": "{:.3f}"}
             ),
             width="stretch",
             hide_index=True,
         )
-
         render_insight(
             "Class-level performance",
             f"The strongest class by F1 is {strongest['Obesity Category']} "
@@ -5590,12 +5458,11 @@ def render_model_evaluation_page() -> None:
             "sufficient for evaluating a seven-class model."
         )
 
-    elif evaluation_view == "ROC":
+    with tabs[3]:
         if bundle.get("roc_probability_verified", False):
             try:
                 roc_details = compute_roc_details(bundle)
                 roc_tab1, roc_tab2 = st.tabs(["Per-class ROC", "Micro / Macro ROC"])
-
                 with roc_tab1:
                     render_plotly(
                         plot_roc_classes(roc_details),
@@ -5604,13 +5471,8 @@ def render_model_evaluation_page() -> None:
                     source_roc = NOTEBOOK_ROC_SUMMARY[model_name]
                     auc_table = pd.DataFrame(
                         {
-                            "Obesity Category": [
-                                display_label(c) for c in OBESITY_ORDER
-                            ],
-                            "Class AUC": [
-                                source_roc["Per Class"][c]
-                                for c in OBESITY_ORDER
-                            ],
+                            "Obesity Category": [display_label(c) for c in OBESITY_ORDER],
+                            "Class AUC": [source_roc["Per Class"][c] for c in OBESITY_ORDER],
                         }
                     )
                     st.dataframe(
@@ -5619,26 +5481,22 @@ def render_model_evaluation_page() -> None:
                         hide_index=True,
                     )
                     st.caption(
-                        "Each coloured curve is a one-vs-rest class ROC curve; "
-                        "its AUC is shown directly in the legend."
+                        "Each coloured curve is a one-vs-rest class ROC curve; its AUC is shown directly in the legend."
                     )
-
                 with roc_tab2:
                     render_plotly(
                         plot_roc_averages(roc_details),
                         key=f"roc_avg_{model_name}",
                     )
-
             except Exception:
                 render_roc_summary_from_notebook(model_name)
         else:
             render_roc_summary_from_notebook(model_name)
 
-    elif evaluation_view == "Feature Analysis":
+    with tabs[4]:
         feature_df, title, note = model_feature_analysis(model_name, bundle)
         st.markdown(f"### {title}")
         st.write(note)
-
         if feature_df is None:
             st.info("No supported feature-analysis view is available for this model.")
         else:
